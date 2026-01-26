@@ -58,8 +58,15 @@ export function TimelineTrack({
 
 function OriginalAudioTrack({ height }: { height: number }): React.JSX.Element {
   const { durationMs } = usePlaybackStore()
-  const { msToPixels, waveformData, waveformLoading, waveformError, loadWaveform, clearWaveform } =
-    useTimelineStore()
+  const {
+    msToPixels,
+    showWaveform,
+    waveformData,
+    waveformLoading,
+    waveformError,
+    loadWaveform,
+    clearWaveform
+  } = useTimelineStore()
   const currentProject = useProjectStore((state) => state.currentProject)
   const prevProjectIdRef = useRef<string | undefined>(undefined)
 
@@ -98,9 +105,9 @@ function OriginalAudioTrack({ height }: { height: number }): React.JSX.Element {
   return (
     <div className="h-full bg-chrome-bg/50 relative" style={{ width: trackWidth }}>
       {/* Waveform display */}
-      {waveformData ? (
+      {showWaveform && waveformData ? (
         <WaveformDisplay waveformData={waveformData} height={height} />
-      ) : waveformLoading ? (
+      ) : showWaveform && waveformLoading ? (
         <div className="absolute inset-0 flex items-center justify-center text-chrome-muted text-xs">
           <svg className="w-4 h-4 animate-spin mr-2" fill="none" viewBox="0 0 24 24">
             <circle
@@ -119,12 +126,12 @@ function OriginalAudioTrack({ height }: { height: number }): React.JSX.Element {
           </svg>
           Loading waveform...
         </div>
-      ) : waveformError ? (
+      ) : showWaveform && waveformError ? (
         <div className="absolute inset-0 flex items-center justify-center text-red-400 text-xs">
           Waveform unavailable
         </div>
       ) : (
-        // Fallback placeholder gradient
+        // Fallback placeholder gradient (shown when waveform disabled or not yet loaded)
         <div
           className="h-full flex items-center"
           style={{
