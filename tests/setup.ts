@@ -106,7 +106,8 @@ vi.stubGlobal('dubdesk', {
     undo: vi.fn(),
     redo: vi.fn(),
     getStack: vi.fn(),
-    clear: vi.fn()
+    clear: vi.fn(),
+    record: vi.fn()
   },
   project: {
     getCurrent: vi.fn(),

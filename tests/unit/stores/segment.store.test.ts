@@ -202,6 +202,11 @@ describe('SegmentStore', () => {
         success: true,
         segment: updatedSegment
       })
+      vi.mocked(window.dubdesk.history.record).mockResolvedValue({
+        success: true,
+        canUndo: true,
+        canRedo: false
+      })
 
       await useSegmentStore.getState().updateSegment('seg-1', { translatedText: 'Updated text' })
 
@@ -226,6 +231,11 @@ describe('SegmentStore', () => {
       useSegmentStore.setState({ segments: [mockSegment], selectedSegmentIds: new Set(['seg-1']) })
 
       vi.mocked(window.dubdesk.segment.delete).mockResolvedValue({ success: true })
+      vi.mocked(window.dubdesk.history.record).mockResolvedValue({
+        success: true,
+        canUndo: true,
+        canRedo: false
+      })
 
       await useSegmentStore.getState().deleteSegment('seg-1')
 
@@ -258,6 +268,11 @@ describe('SegmentStore', () => {
       })
 
       vi.mocked(window.dubdesk.segment.delete).mockResolvedValue({ success: true })
+      vi.mocked(window.dubdesk.history.record).mockResolvedValue({
+        success: true,
+        canUndo: true,
+        canRedo: false
+      })
 
       await useSegmentStore.getState().deleteSelectedSegments()
 
@@ -464,6 +479,11 @@ describe('SegmentStore', () => {
       vi.mocked(window.dubdesk.segment.merge).mockResolvedValue({
         success: true,
         segment: mergedSegment
+      })
+      vi.mocked(window.dubdesk.history.record).mockResolvedValue({
+        success: true,
+        canUndo: true,
+        canRedo: false
       })
 
       const result = await useSegmentStore.getState().mergeSegments(['seg-1', 'seg-2'])

@@ -74,6 +74,11 @@ describe('history.store', () => {
         canUndo: true,
         canRedo: true
       })
+      // Mock segment.getAll for loadSegments call after undo
+      vi.mocked(window.dubdesk.segment.getAll).mockResolvedValue({
+        success: true,
+        data: []
+      })
 
       await useHistoryStore.getState().undo()
 
@@ -89,6 +94,11 @@ describe('history.store', () => {
       vi.mocked(window.dubdesk.history.undo).mockResolvedValue({
         success: true
         // canUndo and canRedo not provided
+      })
+      // Mock segment.getAll for loadSegments call after undo
+      vi.mocked(window.dubdesk.segment.getAll).mockResolvedValue({
+        success: true,
+        data: []
       })
 
       await useHistoryStore.getState().undo()
@@ -138,6 +148,11 @@ describe('history.store', () => {
         canUndo: true,
         canRedo: false
       })
+      // Mock segment.getAll for loadSegments call after redo
+      vi.mocked(window.dubdesk.segment.getAll).mockResolvedValue({
+        success: true,
+        data: []
+      })
 
       await useHistoryStore.getState().redo()
 
@@ -153,6 +168,11 @@ describe('history.store', () => {
       vi.mocked(window.dubdesk.history.redo).mockResolvedValue({
         success: true
         // canUndo and canRedo not provided
+      })
+      // Mock segment.getAll for loadSegments call after redo
+      vi.mocked(window.dubdesk.segment.getAll).mockResolvedValue({
+        success: true,
+        data: []
       })
 
       await useHistoryStore.getState().redo()
@@ -281,6 +301,11 @@ describe('history.store', () => {
         loadingDuringCall = useHistoryStore.getState().isLoading
         return { success: true }
       })
+      // Mock segment.getAll for loadSegments call after undo
+      vi.mocked(window.dubdesk.segment.getAll).mockResolvedValue({
+        success: true,
+        data: []
+      })
 
       await useHistoryStore.getState().undo()
 
@@ -295,6 +320,11 @@ describe('history.store', () => {
       vi.mocked(window.dubdesk.history.redo).mockImplementation(async () => {
         loadingDuringCall = useHistoryStore.getState().isLoading
         return { success: true }
+      })
+      // Mock segment.getAll for loadSegments call after redo
+      vi.mocked(window.dubdesk.segment.getAll).mockResolvedValue({
+        success: true,
+        data: []
       })
 
       await useHistoryStore.getState().redo()

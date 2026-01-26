@@ -20,8 +20,8 @@ describe('TimelineStore', () => {
 
     it('should clamp zoom to min value', () => {
       const { setZoom } = useTimelineStore.getState()
-      setZoom(0.1)
-      expect(useTimelineStore.getState().zoom).toBe(0.5)
+      setZoom(0.005) // Below MIN_ZOOM of 0.01
+      expect(useTimelineStore.getState().zoom).toBe(0.01)
     })
 
     it('should clamp zoom to max value', () => {
@@ -48,9 +48,9 @@ describe('TimelineStore', () => {
       const { zoomToFit } = useTimelineStore.getState()
       // 60000ms = 60 seconds, 1000px viewport
       // Target pps = 1000 / 60 = 16.67
-      // Target zoom = 16.67 / 100 = 0.167, clamped to 0.5
+      // Target zoom = 16.67 / 100 = 0.1667 (within MIN_ZOOM of 0.01)
       zoomToFit(60000, 1000)
-      expect(useTimelineStore.getState().zoom).toBe(0.5)
+      expect(useTimelineStore.getState().zoom).toBeCloseTo(0.1667, 3)
       expect(useTimelineStore.getState().scrollPosition).toBe(0)
     })
   })
