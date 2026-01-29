@@ -1,6 +1,6 @@
 {
   "name": "dubdesk",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "AI-powered video dubbing studio - desktop application",
   "main": "./out/main/index.js",
   "author": "DubDesk",
