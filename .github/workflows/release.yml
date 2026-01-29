@@ -38,8 +38,18 @@ jobs:
           node-version: '20'
           cache: 'pnpm'
 
+      - name: Setup Python (Windows only)
+        if: matrix.platform == 'win'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Install dependencies
         run: pnpm install
+
+      - name: Rebuild native modules for Electron (Windows only)
+        if: matrix.platform == 'win'
+        run: pnpm exec electron-builder install-app-deps
 
       - name: Import Apple certificate (macOS only)
         if: matrix.platform == 'mac'
@@ -83,6 +93,7 @@ jobs:
             dist/*.exe
             dist/*.AppImage
             dist/*.deb
+            dist/*.snap
           if-no-files-found: ignore
 
   release:
