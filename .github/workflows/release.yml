@@ -48,7 +48,8 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libarchive-tools
+          sudo apt-get install -y libarchive-tools rpm ruby ruby-dev build-essential
+          sudo gem install --no-document fpm
 
       - name: Install dependencies
         run: pnpm install
@@ -88,6 +89,7 @@ jobs:
           APPLE_ID: ${{ vars.APPLE_ID }}
           APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          USE_SYSTEM_FPM: true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
