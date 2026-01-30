@@ -823,6 +823,17 @@ function SegmentProperties({ segment }: { segment: Segment }): React.JSX.Element
   const updateSegment = useSegmentStore((state) => state.updateSegment)
   const speakers = useSegmentStore((state) => state.speakers)
 
+  // Local state for text fields to prevent cursor jumping
+  const [localOriginalText, setLocalOriginalText] = useState(segment.originalText || '')
+  const [localTranslatedText, setLocalTranslatedText] = useState(segment.translatedText || '')
+
+  // Sync local state only when selecting a different segment
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally only sync on segment.id change
+  useEffect(() => {
+    setLocalOriginalText(segment.originalText || '')
+    setLocalTranslatedText(segment.translatedText || '')
+  }, [segment.id])
+
   const isStale = isSegmentStale(segment)
   const speaker = speakers.find((s: Speaker) => s.id === segment.speakerId)
 
@@ -888,8 +899,13 @@ function SegmentProperties({ segment }: { segment: Segment }): React.JSX.Element
       <div>
         <label className="block text-xs text-chrome-muted mb-1">Original</label>
         <textarea
-          value={segment.originalText || ''}
-          onChange={(e) => updateSegment(segment.id, { originalText: e.target.value })}
+          value={localOriginalText}
+          onChange={(e) => setLocalOriginalText(e.target.value)}
+          onBlur={() => {
+            if (localOriginalText !== (segment.originalText || '')) {
+              updateSegment(segment.id, { originalText: localOriginalText })
+            }
+          }}
           className="w-full px-1.5 py-1 bg-chrome-bg border border-chrome-border rounded text-xs resize-none"
           rows={3}
           placeholder="Original text..."
@@ -900,8 +916,13 @@ function SegmentProperties({ segment }: { segment: Segment }): React.JSX.Element
       <div>
         <label className="block text-xs text-chrome-muted mb-1">Translated</label>
         <textarea
-          value={segment.translatedText}
-          onChange={(e) => updateSegment(segment.id, { translatedText: e.target.value })}
+          value={localTranslatedText}
+          onChange={(e) => setLocalTranslatedText(e.target.value)}
+          onBlur={() => {
+            if (localTranslatedText !== (segment.translatedText || '')) {
+              updateSegment(segment.id, { translatedText: localTranslatedText })
+            }
+          }}
           className="w-full px-1.5 py-1 bg-chrome-bg border border-chrome-border rounded text-xs resize-none"
           rows={3}
           placeholder="Translated text..."
