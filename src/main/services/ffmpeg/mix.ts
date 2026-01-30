@@ -56,6 +56,8 @@ export interface MixOptions {
   dubbedVolume?: number
   /** Target duration in milliseconds - output will be padded with silence if shorter */
   targetDurationMs?: number
+  /** Minimum gap duration (ms) before using original audio. Gaps shorter than this will use silence. */
+  minGapForOriginalMs?: number
 }
 
 export interface MixResult {
@@ -124,19 +126,33 @@ export async function mixAudio(
     audioPath: string
     volume: number
   }
-  type Piece = OriginalPiece | SegmentPiece
+  interface SilencePiece {
+    type: 'silence'
+    durationMs: number
+  }
+  type Piece = OriginalPiece | SegmentPiece | SilencePiece
 
+  const minGapMs = options.minGapForOriginalMs ?? 0 // 0 means always use original audio
   const pieces: Piece[] = []
   let currentMs = 0
 
   for (const segment of sortedSegments) {
     // Add gap before this segment (if any)
     if (segment.startTimeMs > currentMs) {
-      pieces.push({
-        type: 'original',
-        startMs: currentMs,
-        endMs: segment.startTimeMs
-      })
+      const gapDurationMs = segment.startTimeMs - currentMs
+      // Use silence for gaps shorter than minGapMs, otherwise use original audio
+      if (minGapMs > 0 && gapDurationMs < minGapMs) {
+        pieces.push({
+          type: 'silence',
+          durationMs: gapDurationMs
+        })
+      } else {
+        pieces.push({
+          type: 'original',
+          startMs: currentMs,
+          endMs: segment.startTimeMs
+        })
+      }
     }
 
     // Add the dubbed segment
@@ -150,6 +166,7 @@ export async function mixAudio(
   }
 
   // Add final gap after last segment (if any)
+  // Always use original audio for the final gap (not silence)
   if (currentMs < totalDurationMs) {
     pieces.push({
       type: 'original',
@@ -192,6 +209,12 @@ export async function mixAudio(
         filters.push(
           `[0:a]atrim=start=${startSec.toFixed(3)}:end=${endSec.toFixed(3)},volume=${originalVolume},asetpts=PTS-STARTPTS[${label}]`
         )
+      } else if (piece.type === 'silence') {
+        // Generate silence for small gaps between segments
+        const durationSec = piece.durationMs / 1000
+        filters.push(
+          `anullsrc=r=${sampleRate}:cl=stereo,atrim=0:${durationSec.toFixed(3)},asetpts=PTS-STARTPTS[${label}]`
+        )
       } else {
         // Use segment audio with volume adjustment (dubbed volume * segment's individual volume)
         const inputNum = segmentInputs[segmentIdx]
@@ -211,10 +234,14 @@ export async function mixAudio(
       filters.push(`${concatInputs.join('')}concat=n=${pieces.length}:v=0:a=1[concat_out]`)
       // Generate silence for the padding duration
       const padDurationSec = (targetDurationMs - totalDurationMs) / 1000
-      filters.push(`anullsrc=r=${sampleRate}:cl=stereo,atrim=0:${padDurationSec.toFixed(3)}[silence]`)
+      filters.push(
+        `anullsrc=r=${sampleRate}:cl=stereo,atrim=0:${padDurationSec.toFixed(3)}[silence]`
+      )
       // Concatenate the mixed audio with silence
       filters.push(`[concat_out][silence]concat=n=2:v=0:a=1[out]`)
-      console.log(`[FFmpeg:Mix] Adding ${padDurationSec.toFixed(2)}s silence to reach target duration`)
+      console.log(
+        `[FFmpeg:Mix] Adding ${padDurationSec.toFixed(2)}s silence to reach target duration`
+      )
     } else {
       filters.push(`${concatInputs.join('')}concat=n=${pieces.length}:v=0:a=1[out]`)
     }

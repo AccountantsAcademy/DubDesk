@@ -21,6 +21,7 @@ interface PlaybackStoreState {
   scrubbing: boolean
   currentSegmentId: string | null
   playingDubbedSegmentId: string | null // Track when dubbed audio is actively playing
+  inSmallGap: boolean // Track when we're in a small gap between segments (keeps original audio muted)
 }
 
 interface PlaybackActions {
@@ -51,6 +52,7 @@ interface PlaybackActions {
     currentTimeMs: number
   ) => void
   setPlayingDubbedSegmentId: (segmentId: string | null) => void
+  setInSmallGap: (inGap: boolean) => void
   reset: () => void
 }
 
@@ -72,7 +74,8 @@ const initialState: PlaybackStoreState = {
   soloDubbed: false,
   scrubbing: false,
   currentSegmentId: null,
-  playingDubbedSegmentId: null
+  playingDubbedSegmentId: null,
+  inSmallGap: false
 }
 
 export const usePlaybackStore = create<PlaybackStore>()(
@@ -210,6 +213,10 @@ export const usePlaybackStore = create<PlaybackStore>()(
         set({ playingDubbedSegmentId: segmentId })
       },
 
+      setInSmallGap: (inGap) => {
+        set({ inSmallGap: inGap })
+      },
+
       reset: () => set(initialState)
     })),
     { name: 'playback-store' }
@@ -242,6 +249,8 @@ export const selectCurrentSegmentId = (state: PlaybackStore) => state.currentSeg
 
 export const selectPlayingDubbedSegmentId = (state: PlaybackStore) => state.playingDubbedSegmentId
 
-// Returns true if original audio should be muted (dubbed audio is playing)
+export const selectInSmallGap = (state: PlaybackStore) => state.inSmallGap
+
+// Returns true if original audio should be muted (dubbed audio is playing or in small gap)
 export const selectShouldMuteOriginal = (state: PlaybackStore) =>
-  state.playingDubbedSegmentId !== null && !state.soloOriginal
+  (state.playingDubbedSegmentId !== null || state.inSmallGap) && !state.soloOriginal

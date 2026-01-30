@@ -140,6 +140,7 @@ const api = {
         sampleRate?: number
         originalVolume?: number
         dubbedVolume?: number
+        minGapForOriginalMs?: number
       }
     }) => ipcRenderer.invoke(IPC_CHANNELS.FFMPEG.MIX_AUDIO, data),
     export: (data: unknown) => ipcRenderer.invoke(IPC_CHANNELS.FFMPEG.EXPORT, data),

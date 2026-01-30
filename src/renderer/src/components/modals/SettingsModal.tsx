@@ -1,3 +1,4 @@
+import { useProjectStore } from '@renderer/stores/project.store'
 import { useUIStore } from '@renderer/stores/ui.store'
 import type React from 'react'
 import { useCallback, useEffect, useState } from 'react'
@@ -15,6 +16,48 @@ const API_KEY_TYPES = {
   ELEVENLABS: 'elevenlabs_api_key',
   ANTHROPIC: 'anthropic_api_key'
 } as const
+
+function GeneralSettings(): React.JSX.Element {
+  const currentProject = useProjectStore((state) => state.currentProject)
+  const updateSettings = useProjectStore((state) => state.updateSettings)
+  const minGapForOriginalMs = currentProject?.settings?.minGapForOriginalMs ?? 5000
+
+  return (
+    <div className="space-y-6">
+      {/* Audio Settings */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-medium">Audio</h3>
+
+        {/* Min Gap for Original Audio */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-sm text-chrome-text">Min Gap for Original Audio</label>
+            <span className="text-sm text-chrome-muted">
+              {(minGapForOriginalMs / 1000).toFixed(1)}s
+            </span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="10000"
+            step="500"
+            value={minGapForOriginalMs}
+            onChange={(e) => updateSettings({ minGapForOriginalMs: Number(e.target.value) })}
+            className="w-full h-2 bg-chrome-bg rounded-lg appearance-none cursor-pointer accent-accent-primary"
+            disabled={!currentProject}
+          />
+          <p className="text-xs text-chrome-muted">
+            During playback and export, gaps shorter than this duration will stay silent instead of
+            switching back to the original audio. Set to 0 to always use original audio in gaps.
+          </p>
+          {!currentProject && (
+            <p className="text-xs text-yellow-500">Open a project to change this setting.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function SettingsModal(): React.JSX.Element | null {
   const isOpen = useUIStore((state) => state.modals.settings.isOpen)
@@ -481,11 +524,7 @@ export function SettingsModal(): React.JSX.Element | null {
             </div>
           )}
 
-          {activeTab === 'general' && (
-            <div className="space-y-6">
-              <p className="text-chrome-muted">General settings coming soon.</p>
-            </div>
-          )}
+          {activeTab === 'general' && <GeneralSettings />}
         </div>
 
         {/* Footer */}

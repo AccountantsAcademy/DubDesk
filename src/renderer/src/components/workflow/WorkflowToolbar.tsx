@@ -408,6 +408,7 @@ export function WorkflowToolbar(): React.JSX.Element | null {
 
         // Mix dubbed audio with original using volume settings from export settings
         const mixedAudioPath = `${projectTempDir}/mixed_audio.wav`
+        const minGapForOriginalMs = currentProject.settings?.minGapForOriginalMs ?? 5000
         await window.dubdesk.ffmpeg.mixAudio({
           originalAudioPath,
           segments: segmentsWithAudio.map((s) => ({
@@ -419,7 +420,8 @@ export function WorkflowToolbar(): React.JSX.Element | null {
           outputPath: mixedAudioPath,
           options: {
             originalVolume: exportSettings.originalVolume,
-            dubbedVolume: exportSettings.dubbedVolume
+            dubbedVolume: exportSettings.dubbedVolume,
+            minGapForOriginalMs
           }
         })
 

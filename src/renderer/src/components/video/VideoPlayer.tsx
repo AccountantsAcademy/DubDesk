@@ -51,6 +51,8 @@ export function VideoPlayer(): React.JSX.Element {
     video.playbackRate = playbackRate
   }, [playbackRate])
 
+  const inSmallGap = usePlaybackStore((state) => state.inSmallGap)
+
   // Sync volume
   useEffect(() => {
     const video = videoRef.current
@@ -62,12 +64,20 @@ export function VideoPlayer(): React.JSX.Element {
       effectiveVolume = 0 // Mute original when soloing dubbed
     } else if (soloOriginal) {
       effectiveVolume = volume // Full volume when soloing original
-    } else if (playingDubbedSegmentId !== null) {
-      effectiveVolume = 0 // Mute original when dubbed audio is playing for a segment
+    } else if (playingDubbedSegmentId !== null || inSmallGap) {
+      effectiveVolume = 0 // Mute original when dubbed audio is playing or in small gap between segments
     }
 
     video.volume = muted ? 0 : effectiveVolume
-  }, [volume, muted, originalAudioVolume, soloOriginal, soloDubbed, playingDubbedSegmentId])
+  }, [
+    volume,
+    muted,
+    originalAudioVolume,
+    soloOriginal,
+    soloDubbed,
+    playingDubbedSegmentId,
+    inSmallGap
+  ])
 
   // Track if we're currently syncing from video to store
   const isSyncingFromVideo = useRef(false)

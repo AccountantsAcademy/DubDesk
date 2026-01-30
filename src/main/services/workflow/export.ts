@@ -132,6 +132,7 @@ export async function runExportWorkflow(
     // Get volume settings from project (with defaults)
     const originalVolume = project.settings?.originalAudioVolume ?? 0.3
     const dubbedVolume = project.settings?.dubbedAudioVolume ?? 1.0
+    const minGapForOriginalMs = project.settings?.minGapForOriginalMs ?? 5000
 
     await mixAudio(
       project.sourceAudioPath,
@@ -141,6 +142,7 @@ export async function runExportWorkflow(
         ...mixOptions,
         originalVolume,
         dubbedVolume,
+        minGapForOriginalMs,
         // Ensure output matches video duration exactly
         targetDurationMs: project.sourceVideoDurationMs
       },

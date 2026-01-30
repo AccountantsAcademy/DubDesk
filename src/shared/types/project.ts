@@ -28,6 +28,8 @@ export interface ProjectSettings {
   duckingGainDb: number
   snapToGrid: boolean
   gridSizeMs: number
+  /** Minimum gap duration (ms) before switching back to original audio. Gaps shorter than this will stay muted. Default: 5000 (5 seconds) */
+  minGapForOriginalMs: number
 }
 
 export interface ProjectCreateInput {
@@ -61,5 +63,6 @@ export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
   duckingEnabled: true,
   duckingGainDb: -12,
   snapToGrid: true,
-  gridSizeMs: 100
+  gridSizeMs: 100,
+  minGapForOriginalMs: 5000
 }
