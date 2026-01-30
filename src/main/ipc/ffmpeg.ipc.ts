@@ -250,6 +250,7 @@ export function registerFFmpegHandlers(): void {
         // Construct project directory path
         const { app } = await import('electron')
         const path = await import('node:path')
+        const fs = await import('node:fs')
         const projectDir = path.join(app.getPath('userData'), 'projects', data.projectId)
 
         // Try to load from cache first unless force refresh
@@ -262,6 +263,15 @@ export function registerFFmpegHandlers(): void {
               data: cached,
               cached: true
             }
+          }
+        }
+
+        // Check if media file exists
+        if (!fs.existsSync(data.mediaPath)) {
+          console.error('[FFmpeg:Waveform] Media file not found:', data.mediaPath)
+          return {
+            success: false,
+            error: `Media file not found: ${data.mediaPath}`
           }
         }
 
