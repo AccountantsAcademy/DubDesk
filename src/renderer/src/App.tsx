@@ -590,7 +590,7 @@ function ProjectOverview(): React.JSX.Element {
         const segmentDuration = s.endTimeMs - s.startTimeMs
         const stretchRatio = segmentDuration / s.audioDurationMs
         const stretchPercent = Math.abs(stretchRatio - 1) * 100
-        return stretchPercent > 15 && stretchPercent <= 25
+        return stretchPercent > 10 && stretchPercent <= 20
       }),
     [segments]
   )
@@ -602,7 +602,7 @@ function ProjectOverview(): React.JSX.Element {
         const segmentDuration = s.endTimeMs - s.startTimeMs
         const stretchRatio = segmentDuration / s.audioDurationMs
         const stretchPercent = Math.abs(stretchRatio - 1) * 100
-        return stretchPercent > 25
+        return stretchPercent > 20
       }),
     [segments]
   )
@@ -755,7 +755,7 @@ function ProjectOverview(): React.JSX.Element {
               />
             </svg>
             <span className="text-xs text-red-500 font-medium">
-              {stretchedRed.length} severely stretched ({'>'}25%)
+              {stretchedRed.length} severely stretched ({'>'}20%)
             </span>
           </div>
           <button
@@ -780,7 +780,7 @@ function ProjectOverview(): React.JSX.Element {
               />
             </svg>
             <span className="text-xs text-orange-500 font-medium">
-              {stretchedOrange.length} stretched ({'>'}15%)
+              {stretchedOrange.length} stretched ({'>'}10%)
             </span>
           </div>
           <button
