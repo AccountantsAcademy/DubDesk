@@ -198,6 +198,9 @@ export async function saveWaveformCache(
   projectDir: string,
   waveformData: WaveformData
 ): Promise<string> {
+  // Ensure the project directory exists
+  await fs.promises.mkdir(projectDir, { recursive: true })
+
   const cachePath = path.join(projectDir, 'waveform.json')
   await fs.promises.writeFile(cachePath, JSON.stringify(waveformData))
   return cachePath
