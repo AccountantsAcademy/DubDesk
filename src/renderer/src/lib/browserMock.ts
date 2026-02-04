@@ -120,7 +120,10 @@ export function createBrowserMock() {
       saveDialog: async () => ({ success: true, canceled: false, filePath: '/mock/output.mp4' }),
       readCSV: async () => ({ success: true, data: [] }),
       getAppPath: async () => ({ success: true, data: '/mock/app' }),
-      getTempDir: async () => ({ success: true, data: '/tmp' }),
+      getTempDir: async (_data?: { projectId?: string; subDir?: string }) => ({
+        success: true,
+        path: '/tmp/dubdesk'
+      }),
       exists: async () => ({ success: true, exists: true }),
       mkdir: async () => ({ success: true }),
       deleteFile: async () => ({ success: true }),
