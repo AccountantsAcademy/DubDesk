@@ -7,6 +7,12 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { BrowserWindow, dialog } from 'electron'
+import ffmpegStaticRaw from 'ffmpeg-static'
+import ffprobeStaticRaw from 'ffprobe-static'
+
+// Fix asar path for packaged Electron apps (binaries are in app.asar.unpacked)
+const ffmpegBin = ffmpegStaticRaw?.replace('app.asar', 'app.asar.unpacked') ?? 'ffmpeg'
+const ffprobeBin = ffprobeStaticRaw?.path?.replace('app.asar', 'app.asar.unpacked') ?? 'ffprobe'
 
 export interface VideoMetadata {
   duration: number // in milliseconds
@@ -159,7 +165,7 @@ export async function getMediaMetadata(filePath: string): Promise<VideoMetadata>
   return new Promise((resolve, reject) => {
     const args = ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', filePath]
 
-    const ffprobe = spawn('ffprobe', args)
+    const ffprobe = spawn(ffprobeBin, args)
     let stdout = ''
     let stderr = ''
 
@@ -277,7 +283,7 @@ export async function extractAudio(
       outputPath
     ]
 
-    const ffmpeg = spawn('ffmpeg', args)
+    const ffmpeg = spawn(ffmpegBin, args)
     let stderr = ''
 
     ffmpeg.stderr.on('data', (data) => {
@@ -330,7 +336,7 @@ export async function generateThumbnail(
       outputPath
     ]
 
-    const ffmpeg = spawn('ffmpeg', args)
+    const ffmpeg = spawn(ffmpegBin, args)
     let stderr = ''
 
     ffmpeg.stderr.on('data', (data) => {

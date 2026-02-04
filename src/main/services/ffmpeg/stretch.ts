@@ -8,12 +8,15 @@ import ffmpegStatic from 'ffmpeg-static'
 import ffprobeStatic from 'ffprobe-static'
 import ffmpeg from 'fluent-ffmpeg'
 
-// Set FFmpeg paths from static binaries
-if (ffmpegStatic) {
-  ffmpeg.setFfmpegPath(ffmpegStatic)
+// Fix asar path for packaged Electron apps (binaries are in app.asar.unpacked)
+const ffmpegPath = ffmpegStatic?.replace('app.asar', 'app.asar.unpacked')
+const ffprobePath = ffprobeStatic?.path?.replace('app.asar', 'app.asar.unpacked')
+
+if (ffmpegPath) {
+  ffmpeg.setFfmpegPath(ffmpegPath)
 }
-if (ffprobeStatic?.path) {
-  ffmpeg.setFfprobePath(ffprobeStatic.path)
+if (ffprobePath) {
+  ffmpeg.setFfprobePath(ffprobePath)
 }
 
 /**
