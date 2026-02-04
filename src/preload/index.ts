@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC_CHANNELS } from '../shared/constants/channels'
 
@@ -192,7 +193,8 @@ const api = {
         videoPath,
         outputPath,
         timeSeconds
-      })
+      }),
+    joinPath: (...segments: string[]) => path.join(...segments)
   },
 
   // Settings operations

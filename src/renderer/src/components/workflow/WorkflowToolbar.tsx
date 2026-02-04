@@ -398,7 +398,7 @@ export function WorkflowToolbar(): React.JSX.Element | null {
         const projectTempDir = tempDir.path
 
         // Extract original audio
-        const originalAudioPath = `${projectTempDir}/original_audio.wav`
+        const originalAudioPath = window.dubdesk.fs.joinPath(projectTempDir, 'original_audio.wav')
         await window.dubdesk.ffmpeg.extractAudio(
           currentProject.sourceVideoPath,
           originalAudioPath,
@@ -410,7 +410,7 @@ export function WorkflowToolbar(): React.JSX.Element | null {
         setWorkflowState({ stage: 'exporting', progress: 10, message: 'Mixing audio... 0%' })
 
         // Mix dubbed audio with original using volume settings from export settings
-        const mixedAudioPath = `${projectTempDir}/mixed_audio.wav`
+        const mixedAudioPath = window.dubdesk.fs.joinPath(projectTempDir, 'mixed_audio.wav')
         const minGapForOriginalMs = currentProject.settings?.minGapForOriginalMs ?? 5000
         await window.dubdesk.ffmpeg.mixAudio({
           originalAudioPath,
