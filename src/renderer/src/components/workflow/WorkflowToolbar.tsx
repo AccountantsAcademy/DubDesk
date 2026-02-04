@@ -248,8 +248,11 @@ export function WorkflowToolbar(): React.JSX.Element | null {
       const voiceIdToUse = defaultVoice.voice_id
 
       // Get output directory
-      const tempDir = await window.dubdesk.fs.getTempDir()
-      const outputDir = `${tempDir.path}/dubdesk/${currentProject.id}/audio`
+      const tempDir = await window.dubdesk.fs.getTempDir({
+        projectId: currentProject.id,
+        subDir: 'audio'
+      })
+      const outputDir = tempDir.path
 
       // Start batch generation
       const result = await window.dubdesk.tts.generateBatch({
@@ -391,8 +394,8 @@ export function WorkflowToolbar(): React.JSX.Element | null {
 
       try {
         // Get temp directory for intermediate files
-        const tempDir = await window.dubdesk.fs.getTempDir()
-        const projectTempDir = `${tempDir.path}/dubdesk/${currentProject.id}`
+        const tempDir = await window.dubdesk.fs.getTempDir({ projectId: currentProject.id })
+        const projectTempDir = tempDir.path
 
         // Extract original audio
         const originalAudioPath = `${projectTempDir}/original_audio.wav`

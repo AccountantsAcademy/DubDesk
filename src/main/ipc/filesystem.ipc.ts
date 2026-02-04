@@ -213,40 +213,46 @@ export function registerFilesystemHandlers(): void {
   )
 
   // Get temp directory (for project files)
-  ipcMain.handle(FILESYSTEM.GET_TEMP_DIR, async (_event, data?: { projectId?: string }) => {
-    try {
-      const tempBase = app.getPath('temp')
-      const appTempDir = join(tempBase, 'dubdesk')
+  ipcMain.handle(
+    FILESYSTEM.GET_TEMP_DIR,
+    async (_event, data?: { projectId?: string; subDir?: string }) => {
+      try {
+        const tempBase = app.getPath('temp')
+        const appTempDir = join(tempBase, 'dubdesk')
 
-      // Create the app temp directory if it doesn't exist
-      if (!existsSync(appTempDir)) {
-        mkdirSync(appTempDir, { recursive: true })
-      }
-
-      // If a project ID is provided, create a project-specific temp directory
-      if (data?.projectId) {
-        const projectTempDir = join(appTempDir, data.projectId)
-        if (!existsSync(projectTempDir)) {
-          mkdirSync(projectTempDir, { recursive: true })
+        // Create the app temp directory if it doesn't exist
+        if (!existsSync(appTempDir)) {
+          mkdirSync(appTempDir, { recursive: true })
         }
+
+        // If a project ID is provided, create a project-specific temp directory
+        if (data?.projectId) {
+          let projectTempDir = join(appTempDir, data.projectId)
+          if (data.subDir) {
+            projectTempDir = join(projectTempDir, data.subDir)
+          }
+          if (!existsSync(projectTempDir)) {
+            mkdirSync(projectTempDir, { recursive: true })
+          }
+          return {
+            success: true,
+            path: projectTempDir
+          }
+        }
+
         return {
           success: true,
-          path: projectTempDir
+          path: appTempDir
+        }
+      } catch (error) {
+        console.error('[FS:GetTempDir] Error:', error)
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to get temp directory'
         }
       }
-
-      return {
-        success: true,
-        path: appTempDir
-      }
-    } catch (error) {
-      console.error('[FS:GetTempDir] Error:', error)
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to get temp directory'
-      }
     }
-  })
+  )
 
   // Check if file exists
   ipcMain.handle(FILESYSTEM.EXISTS, async (_event, data: { path: string }) => {

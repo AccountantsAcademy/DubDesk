@@ -177,7 +177,8 @@ const api = {
     readCSV: (filePath: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.FILESYSTEM.READ_CSV, { filePath }),
     getAppPath: () => ipcRenderer.invoke(IPC_CHANNELS.FILESYSTEM.GET_APP_PATH),
-    getTempDir: () => ipcRenderer.invoke(IPC_CHANNELS.FILESYSTEM.GET_TEMP_DIR),
+    getTempDir: (data?: { projectId?: string; subDir?: string }) =>
+      ipcRenderer.invoke(IPC_CHANNELS.FILESYSTEM.GET_TEMP_DIR, data),
     exists: (filePath: string) => ipcRenderer.invoke(IPC_CHANNELS.FILESYSTEM.EXISTS, { filePath }),
     mkdir: (dirPath: string) => ipcRenderer.invoke(IPC_CHANNELS.FILESYSTEM.MKDIR, { dirPath }),
     deleteFile: (filePath: string) =>
