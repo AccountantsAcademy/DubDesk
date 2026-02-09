@@ -93,8 +93,7 @@ export async function stretchAudioToDuration(
   // Calculate speed ratio (how much faster/slower we need to play)
   // If original is 2000ms and target is 4000ms, we need to slow down (ratio = 0.5)
   // If original is 4000ms and target is 2000ms, we need to speed up (ratio = 2.0)
-  // Add 1% bias to prefer slightly shorter output (avoid overlapping next segment)
-  const speedRatio = (originalDurationMs / targetDurationMs) * 1.01
+  const speedRatio = originalDurationMs / targetDurationMs
 
   // If the ratio is very close to 1.0, skip processing
   if (Math.abs(speedRatio - 1.0) < 0.01) {

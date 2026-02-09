@@ -128,6 +128,8 @@ export async function mixAudio(
     type: 'segment'
     audioPath: string
     volume: number
+    startTimeMs: number
+    endTimeMs: number
   }
   interface SilencePiece {
     type: 'silence'
@@ -162,7 +164,9 @@ export async function mixAudio(
     pieces.push({
       type: 'segment',
       audioPath: segment.audioPath,
-      volume: segment.volume ?? 1
+      volume: segment.volume ?? 1,
+      startTimeMs: segment.startTimeMs,
+      endTimeMs: segment.endTimeMs
     })
 
     currentMs = segment.endTimeMs
@@ -220,9 +224,13 @@ export async function mixAudio(
         )
       } else {
         // Use segment audio with volume adjustment (dubbed volume * segment's individual volume)
+        // Pad/trim to exact segment duration to prevent cumulative drift
         const inputNum = segmentInputs[segmentIdx]
         const effectiveVolume = dubbedVolume * piece.volume
-        filters.push(`[${inputNum}:a]volume=${effectiveVolume},asetpts=PTS-STARTPTS[${label}]`)
+        const segmentDurationSec = (piece.endTimeMs - piece.startTimeMs) / 1000
+        filters.push(
+          `[${inputNum}:a]volume=${effectiveVolume},apad=whole_dur=${segmentDurationSec.toFixed(3)},atrim=0:${segmentDurationSec.toFixed(3)},asetpts=PTS-STARTPTS[${label}]`
+        )
         segmentIdx++
       }
 
