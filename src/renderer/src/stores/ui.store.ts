@@ -23,7 +23,10 @@ interface ModalState {
   data?: Record<string, unknown>
 }
 
+type ActiveView = 'welcome' | 'allProjects'
+
 interface UIState {
+  activeView: ActiveView
   sidebarOpen: boolean
   sidebarWidth: number
   panels: Record<PanelId, PanelState>
@@ -79,6 +82,7 @@ interface UIActions {
     onSelect?: (id: string) => void
   ) => void
   hideContextMenu: () => void
+  setActiveView: (view: ActiveView) => void
   reset: () => void
 }
 
@@ -104,6 +108,7 @@ const defaultModals: Record<ModalId, ModalState> = {
 }
 
 const initialState: UIState = {
+  activeView: 'welcome',
   sidebarOpen: true,
   sidebarWidth: 280,
   panels: defaultPanels,
@@ -226,6 +231,8 @@ export const useUIStore = create<UIStore>()(
             contextMenu: { isOpen: false, x: 0, y: 0, items: [], onSelect: undefined }
           })
         },
+
+        setActiveView: (view) => set({ activeView: view }),
 
         reset: () => set({ ...initialState, toasts: [], contextMenu: initialState.contextMenu })
       })),

@@ -28,7 +28,8 @@ const api = {
     update: (id: string, updates: unknown) =>
       ipcRenderer.invoke(IPC_CHANNELS.PROJECT.UPDATE, { id, updates }),
     delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.PROJECT.DELETE, { id }),
-    listRecent: () => ipcRenderer.invoke(IPC_CHANNELS.PROJECT.LIST_RECENT)
+    listRecent: () => ipcRenderer.invoke(IPC_CHANNELS.PROJECT.LIST_RECENT),
+    listAll: () => ipcRenderer.invoke(IPC_CHANNELS.PROJECT.LIST_ALL)
   },
 
   // Segment operations

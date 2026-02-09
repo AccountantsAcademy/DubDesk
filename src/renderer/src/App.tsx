@@ -33,6 +33,7 @@ function getLanguageName(code: string): string {
 function App(): React.JSX.Element {
   const loadRecentProjects = useProjectStore((state) => state.loadRecentProjects)
   const currentProject = useProjectStore((state) => state.currentProject)
+  const activeView = useUIStore((state) => state.activeView)
   const addToast = useUIStore((state) => state.addToast)
 
   useEffect(() => {
@@ -44,7 +45,13 @@ function App(): React.JSX.Element {
 
   return (
     <div className="h-screen w-screen bg-chrome-bg text-chrome-text flex flex-col overflow-hidden">
-      {currentProject ? <EditorView /> : <WelcomeView />}
+      {currentProject ? (
+        <EditorView />
+      ) : activeView === 'allProjects' ? (
+        <AllProjectsView />
+      ) : (
+        <WelcomeView />
+      )}
       {/* Global Modals */}
       <NewProjectModal />
       <SettingsModal />
@@ -60,6 +67,7 @@ function WelcomeView(): React.JSX.Element {
   const recentProjects = useProjectStore((state) => state.recentProjects)
   const loadProject = useProjectStore((state) => state.loadProject)
   const openModal = useUIStore((state) => state.openModal)
+  const setActiveView = useUIStore((state) => state.setActiveView)
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center">
@@ -96,8 +104,164 @@ function WelcomeView(): React.JSX.Element {
               </button>
             ))}
           </div>
+          <button
+            onClick={() => setActiveView('allProjects')}
+            className="w-full mt-4 py-2 text-sm text-chrome-muted hover:text-chrome-text transition-colors"
+          >
+            View All Projects
+          </button>
         </div>
       )}
+    </div>
+  )
+}
+
+function AllProjectsView(): React.JSX.Element {
+  const allProjects = useProjectStore((state) => state.allProjects)
+  const loadAllProjects = useProjectStore((state) => state.loadAllProjects)
+  const loadProject = useProjectStore((state) => state.loadProject)
+  const setActiveView = useUIStore((state) => state.setActiveView)
+
+  const [sortBy, setSortBy] = useState<'name' | 'path' | 'date'>('date')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+
+  useEffect(() => {
+    loadAllProjects()
+  }, [loadAllProjects])
+
+  const sortedProjects = useMemo(() => {
+    const sorted = [...allProjects].sort((a, b) => {
+      if (sortBy === 'name') {
+        return a.name.localeCompare(b.name)
+      }
+      if (sortBy === 'path') {
+        return a.sourceVideoPath.localeCompare(b.sourceVideoPath)
+      }
+      return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
+    })
+    return sortOrder === 'desc' ? sorted.reverse() : sorted
+  }, [allProjects, sortBy, sortOrder])
+
+  const toggleSort = (column: 'name' | 'path' | 'date') => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(column)
+      setSortOrder(column === 'date' ? 'desc' : 'asc')
+    }
+  }
+
+  const formatDate = (dateStr: string) => {
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(new Date(dateStr))
+  }
+
+  const SortIcon = ({ column }: { column: 'name' | 'path' | 'date' }) => {
+    if (sortBy !== column) return null
+    return (
+      <svg
+        className={`w-3.5 h-3.5 transition-transform ${sortOrder === 'desc' ? 'rotate-180' : ''}`}
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+      </svg>
+    )
+  }
+
+  return (
+    <div className="flex-1 flex flex-col p-8 overflow-hidden">
+      <div className="w-full max-w-4xl mx-auto flex flex-col min-h-0">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setActiveView('welcome')}
+              className="text-chrome-muted hover:text-chrome-text transition-colors"
+              title="Back"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                />
+              </svg>
+            </button>
+            <h1 className="text-2xl font-bold">All Projects</h1>
+          </div>
+          <span className="text-sm text-chrome-muted">
+            {sortedProjects.length} project{sortedProjects.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+
+        {/* Table */}
+        {sortedProjects.length === 0 ? (
+          <div className="text-center py-12 text-chrome-muted">
+            <p>No projects found</p>
+          </div>
+        ) : (
+          <div className="bg-chrome-surface border border-chrome-border rounded-lg overflow-auto">
+            <table className="w-full">
+              <thead className="bg-chrome-bg border-b border-chrome-border sticky top-0">
+                <tr>
+                  <th className="text-left px-4 py-3">
+                    <button
+                      onClick={() => toggleSort('name')}
+                      className="flex items-center gap-1.5 text-sm font-medium text-chrome-muted hover:text-chrome-text transition-colors"
+                    >
+                      Name
+                      <SortIcon column="name" />
+                    </button>
+                  </th>
+                  <th className="text-left px-4 py-3">
+                    <button
+                      onClick={() => toggleSort('path')}
+                      className="flex items-center gap-1.5 text-sm font-medium text-chrome-muted hover:text-chrome-text transition-colors"
+                    >
+                      Video Path
+                      <SortIcon column="path" />
+                    </button>
+                  </th>
+                  <th className="text-left px-4 py-3">
+                    <button
+                      onClick={() => toggleSort('date')}
+                      className="flex items-center gap-1.5 text-sm font-medium text-chrome-muted hover:text-chrome-text transition-colors"
+                    >
+                      Last Updated
+                      <SortIcon column="date" />
+                    </button>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedProjects.map((project) => (
+                  <tr
+                    key={project.id}
+                    onClick={() => loadProject(project.id)}
+                    className="border-b border-chrome-border last:border-b-0 hover:bg-chrome-hover cursor-pointer transition-colors"
+                  >
+                    <td className="px-4 py-3 font-medium">{project.name}</td>
+                    <td className="px-4 py-3 text-sm text-chrome-muted truncate max-w-md">
+                      {project.sourceVideoPath}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-chrome-muted whitespace-nowrap">
+                      {formatDate(project.updatedAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

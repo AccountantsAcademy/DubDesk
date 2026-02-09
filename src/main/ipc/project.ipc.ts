@@ -183,7 +183,7 @@ export function registerProjectHandlers(): void {
   // List recent projects
   ipcMain.handle(PROJECT.LIST_RECENT, async () => {
     try {
-      const projects = projectRepository.getRecent(10)
+      const projects = projectRepository.getRecent(5)
 
       return {
         success: true,
@@ -194,6 +194,24 @@ export function registerProjectHandlers(): void {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to list recent projects'
+      }
+    }
+  })
+
+  // List all projects
+  ipcMain.handle(PROJECT.LIST_ALL, async () => {
+    try {
+      const projects = projectRepository.getRecent()
+
+      return {
+        success: true,
+        projects
+      }
+    } catch (error) {
+      console.error('[Project:ListAll] Error:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to list all projects'
       }
     }
   })

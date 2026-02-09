@@ -11,6 +11,7 @@ export const IPC_CHANNELS = {
     SAVE: 'project:save',
     CLOSE: 'project:close',
     LIST_RECENT: 'project:list-recent',
+    LIST_ALL: 'project:list-all',
     DELETE: 'project:delete',
     GET_CURRENT: 'project:get-current',
     UPDATE: 'project:update'

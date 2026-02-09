@@ -194,17 +194,18 @@ export const projectRepository = {
   /**
    * Get recent projects
    */
-  getRecent(limit = 10): RecentProject[] {
+  getRecent(limit?: number): RecentProject[] {
     const db = getDatabase()
-    const stmt = db.prepare(`
+    const query = `
       SELECT p.id, p.name, p.source_video_path, p.updated_at, rp.thumbnail_path
       FROM projects p
       LEFT JOIN recent_projects rp ON p.id = rp.project_id
       ORDER BY COALESCE(rp.last_opened_at, p.updated_at) DESC
-      LIMIT ?
-    `)
+      ${limit ? 'LIMIT ?' : ''}
+    `
+    const stmt = db.prepare(query)
 
-    const rows = stmt.all(limit) as Array<{
+    const rows = (limit ? stmt.all(limit) : stmt.all()) as Array<{
       id: string
       name: string
       source_video_path: string

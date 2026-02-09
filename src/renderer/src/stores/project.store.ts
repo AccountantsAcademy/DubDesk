@@ -5,6 +5,7 @@ import { devtools, subscribeWithSelector } from 'zustand/middleware'
 interface ProjectState {
   currentProject: Project | null
   recentProjects: RecentProject[]
+  allProjects: RecentProject[]
   isLoading: boolean
   isSaving: boolean
   hasUnsavedChanges: boolean
@@ -26,6 +27,7 @@ interface ProjectActions {
   updateSettings: (settings: Partial<ProjectSettings>) => void
   closeProject: () => void
   loadRecentProjects: () => Promise<void>
+  loadAllProjects: () => Promise<void>
   deleteProject: (id: string) => Promise<void>
   setUnsavedChanges: (hasChanges: boolean) => void
   clearError: () => void
@@ -36,6 +38,7 @@ type ProjectStore = ProjectState & ProjectActions
 const initialState: ProjectState = {
   currentProject: null,
   recentProjects: [],
+  allProjects: [],
   isLoading: false,
   isSaving: false,
   hasUnsavedChanges: false,
@@ -150,6 +153,18 @@ export const useProjectStore = create<ProjectStore>()(
           set({ recentProjects: response.projects })
         } catch (error) {
           console.error('Failed to load recent projects:', error)
+        }
+      },
+
+      loadAllProjects: async () => {
+        try {
+          const response = await window.dubdesk.project.listAll()
+          if (!response.success) {
+            throw new Error(response.error)
+          }
+          set({ allProjects: response.projects })
+        } catch (error) {
+          console.error('Failed to load all projects:', error)
         }
       },
 
