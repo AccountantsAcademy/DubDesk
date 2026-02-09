@@ -80,113 +80,120 @@ export async function exportVideo(
   const format = options.format || 'mp4'
 
   return new Promise((resolve, reject) => {
-    let command = ffmpeg(videoPath).input(audioPath)
+    try {
+      let command = ffmpeg(videoPath).input(audioPath)
 
-    // Map video from first input, audio from second
-    command = command.outputOptions('-map', '0:v').outputOptions('-map', '1:a')
+      // Map video from first input, audio from second
+      command = command.outputOptions('-map', '0:v').outputOptions('-map', '1:a')
 
-    // Optionally keep original audio as second track
-    if (options.keepOriginalAudio) {
-      command = command.outputOptions('-map', '0:a')
-    }
-
-    // Video codec settings
-    if (videoCodec === 'copy') {
-      command = command.videoCodec('copy')
-    } else {
-      command = command.videoCodec(videoCodec)
-
-      if (videoCodec === 'libx264' || videoCodec === 'libx265') {
-        command = command.outputOptions('-preset', preset).outputOptions('-crf', String(crf))
+      // Optionally keep original audio as second track
+      if (options.keepOriginalAudio) {
+        command = command.outputOptions('-map', '0:a')
       }
 
-      if (options.resolution) {
-        command = command.size(options.resolution)
+      // Video codec settings
+      if (videoCodec === 'copy') {
+        command = command.videoCodec('copy')
+      } else {
+        command = command.videoCodec(videoCodec)
+
+        if (videoCodec === 'libx264' || videoCodec === 'libx265') {
+          command = command.outputOptions('-preset', preset).outputOptions('-crf', String(crf))
+        }
+
+        if (options.resolution) {
+          command = command.size(options.resolution)
+        }
       }
-    }
 
-    // Audio codec settings
-    if (audioCodec === 'copy') {
-      command = command.audioCodec('copy')
-    } else {
-      command = command.audioCodec(audioCodec).audioBitrate(audioBitrate)
-    }
+      // Audio codec settings
+      if (audioCodec === 'copy') {
+        command = command.audioCodec('copy')
+      } else {
+        command = command.audioCodec(audioCodec).audioBitrate(audioBitrate)
+      }
 
-    // Output format
-    command = command.format(format)
+      // Output format
+      command = command.format(format)
 
-    // Ensure good compatibility for MP4
-    if (format === 'mp4') {
-      command = command.outputOptions('-movflags', '+faststart')
-    }
+      // Ensure good compatibility for MP4
+      if (format === 'mp4') {
+        command = command.outputOptions('-movflags', '+faststart')
+      }
 
-    let durationMs = 0
+      let durationMs = 0
 
-    // Track for cancellation
-    if (exportId) {
-      activeExports.set(exportId, command)
-    }
+      // Track for cancellation
+      if (exportId) {
+        activeExports.set(exportId, command)
+      }
 
-    command
-      .on('start', (cmdline) => {
-        console.log('[FFmpeg:Export] Starting:', cmdline)
-      })
-      .on('codecData', (data) => {
-        if (data.duration) {
-          const parts = data.duration.split(':').map(Number)
-          if (parts.length === 3) {
-            durationMs = (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000
-          }
-        }
-      })
-      .on('progress', (progress) => {
-        if (onProgress) {
-          onProgress({
-            percent: progress.percent || 0,
-            fps: progress.currentFps,
-            currentTime: progress.timemark ? parseTimemark(progress.timemark) : undefined
-          })
-        }
-      })
-      .on('end', async () => {
-        console.log('[FFmpeg:Export] Complete:', outputPath)
-
-        // Remove from active exports
-        if (exportId) {
-          activeExports.delete(exportId)
-        }
-
-        // Get file size
-        let fileSize = 0
-        try {
-          const stats = await stat(outputPath)
-          fileSize = stats.size
-        } catch {
-          // Ignore stat errors
-        }
-
-        resolve({
-          outputPath,
-          durationMs,
-          fileSize
+      command
+        .on('start', (cmdline) => {
+          console.log('[FFmpeg:Export] Starting:', cmdline)
         })
-      })
-      .on('error', (err) => {
-        console.error('[FFmpeg:Export] Error:', err)
+        .on('codecData', (data) => {
+          if (data.duration) {
+            const parts = data.duration.split(':').map(Number)
+            if (parts.length === 3) {
+              durationMs = (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000
+            }
+          }
+        })
+        .on('progress', (progress) => {
+          if (onProgress) {
+            onProgress({
+              percent: progress.percent || 0,
+              fps: progress.currentFps,
+              currentTime: progress.timemark ? parseTimemark(progress.timemark) : undefined
+            })
+          }
+        })
+        .on('end', async () => {
+          console.log('[FFmpeg:Export] Complete:', outputPath)
 
-        // Remove from active exports
-        if (exportId) {
-          activeExports.delete(exportId)
-        }
+          // Remove from active exports
+          if (exportId) {
+            activeExports.delete(exportId)
+          }
 
-        // Check if cancelled
-        if (err.message.includes('SIGKILL')) {
-          reject(new Error('Export cancelled'))
-        } else {
-          reject(new Error(`Video export failed: ${err.message}`))
-        }
-      })
-      .save(outputPath)
+          // Get file size
+          let fileSize = 0
+          try {
+            const stats = await stat(outputPath)
+            fileSize = stats.size
+          } catch {
+            // Ignore stat errors
+          }
+
+          resolve({
+            outputPath,
+            durationMs,
+            fileSize
+          })
+        })
+        .on('error', (err) => {
+          console.error('[FFmpeg:Export] Error:', err)
+
+          // Remove from active exports
+          if (exportId) {
+            activeExports.delete(exportId)
+          }
+
+          // Check if cancelled
+          if (err.message.includes('SIGKILL')) {
+            reject(new Error('Export cancelled'))
+          } else {
+            reject(new Error(`Video export failed: ${err.message}`))
+          }
+        })
+        .save(outputPath)
+    } catch (err) {
+      if (exportId) {
+        activeExports.delete(exportId)
+      }
+      reject(err instanceof Error ? err : new Error(String(err)))
+    }
   })
 }
 
@@ -346,85 +353,92 @@ export async function exportAudioOnly(
   const sampleRate = options.sampleRate || 44100
 
   return new Promise((resolve, reject) => {
-    let command = ffmpeg(audioPath)
+    try {
+      let command = ffmpeg(audioPath)
 
-    // Apply codec and settings
-    switch (audioCodec) {
-      case 'wav':
-        command = command.audioCodec('pcm_s16le').format('wav')
-        break
-      case 'flac':
-        command = command.audioCodec('flac').format('flac')
-        break
-      case 'mp3':
-        command = command.audioCodec('libmp3lame').audioBitrate(audioBitrate).format('mp3')
-        break
-      default:
-        command = command.audioCodec('aac').audioBitrate(audioBitrate).format('m4a')
-        break
-    }
+      // Apply codec and settings
+      switch (audioCodec) {
+        case 'wav':
+          command = command.audioCodec('pcm_s16le').format('wav')
+          break
+        case 'flac':
+          command = command.audioCodec('flac').format('flac')
+          break
+        case 'mp3':
+          command = command.audioCodec('libmp3lame').audioBitrate(audioBitrate).format('mp3')
+          break
+        default:
+          command = command.audioCodec('aac').audioBitrate(audioBitrate).format('m4a')
+          break
+      }
 
-    command = command.audioFrequency(sampleRate).audioChannels(2)
+      command = command.audioFrequency(sampleRate).audioChannels(2)
 
-    let durationMs = 0
+      let durationMs = 0
 
-    // Track for cancellation
-    if (exportId) {
-      activeExports.set(exportId, command)
-    }
+      // Track for cancellation
+      if (exportId) {
+        activeExports.set(exportId, command)
+      }
 
-    command
-      .on('start', (cmdline) => {
-        console.log('[FFmpeg:ExportAudio] Starting:', cmdline)
-      })
-      .on('codecData', (data) => {
-        if (data.duration) {
-          const parts = data.duration.split(':').map(Number)
-          if (parts.length === 3) {
-            durationMs = (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000
-          }
-        }
-      })
-      .on('progress', (progress) => {
-        if (onProgress && progress.percent) {
-          onProgress(progress.percent)
-        }
-      })
-      .on('end', async () => {
-        console.log('[FFmpeg:ExportAudio] Complete:', outputPath)
-
-        if (exportId) {
-          activeExports.delete(exportId)
-        }
-
-        let fileSize = 0
-        try {
-          const stats = await stat(outputPath)
-          fileSize = stats.size
-        } catch {
-          // Ignore stat errors
-        }
-
-        resolve({
-          outputPath,
-          durationMs,
-          fileSize
+      command
+        .on('start', (cmdline) => {
+          console.log('[FFmpeg:ExportAudio] Starting:', cmdline)
         })
-      })
-      .on('error', (err) => {
-        console.error('[FFmpeg:ExportAudio] Error:', err)
+        .on('codecData', (data) => {
+          if (data.duration) {
+            const parts = data.duration.split(':').map(Number)
+            if (parts.length === 3) {
+              durationMs = (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000
+            }
+          }
+        })
+        .on('progress', (progress) => {
+          if (onProgress && progress.percent) {
+            onProgress(progress.percent)
+          }
+        })
+        .on('end', async () => {
+          console.log('[FFmpeg:ExportAudio] Complete:', outputPath)
 
-        if (exportId) {
-          activeExports.delete(exportId)
-        }
+          if (exportId) {
+            activeExports.delete(exportId)
+          }
 
-        if (err.message.includes('SIGKILL')) {
-          reject(new Error('Export cancelled'))
-        } else {
-          reject(new Error(`Audio export failed: ${err.message}`))
-        }
-      })
-      .save(outputPath)
+          let fileSize = 0
+          try {
+            const stats = await stat(outputPath)
+            fileSize = stats.size
+          } catch {
+            // Ignore stat errors
+          }
+
+          resolve({
+            outputPath,
+            durationMs,
+            fileSize
+          })
+        })
+        .on('error', (err) => {
+          console.error('[FFmpeg:ExportAudio] Error:', err)
+
+          if (exportId) {
+            activeExports.delete(exportId)
+          }
+
+          if (err.message.includes('SIGKILL')) {
+            reject(new Error('Export cancelled'))
+          } else {
+            reject(new Error(`Audio export failed: ${err.message}`))
+          }
+        })
+        .save(outputPath)
+    } catch (err) {
+      if (exportId) {
+        activeExports.delete(exportId)
+      }
+      reject(err instanceof Error ? err : new Error(String(err)))
+    }
   })
 }
 

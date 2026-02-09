@@ -1,7 +1,33 @@
 import { join } from 'node:path'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { config } from 'dotenv'
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, dialog, shell } from 'electron'
+
+// Global error handlers to prevent hard crashes
+process.on('uncaughtException', (error) => {
+  console.error('[Main] Uncaught exception:', error)
+  dialog
+    .showMessageBox({
+      type: 'error',
+      title: 'Unexpected Error',
+      message: 'An unexpected error occurred.',
+      detail: error.message
+    })
+    .catch(() => {})
+})
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[Main] Unhandled rejection:', reason)
+  const message = reason instanceof Error ? reason.message : String(reason)
+  dialog
+    .showMessageBox({
+      type: 'error',
+      title: 'Unexpected Error',
+      message: 'An unexpected error occurred.',
+      detail: message
+    })
+    .catch(() => {})
+})
 
 // Load environment variables from .env file
 config()

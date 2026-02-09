@@ -6,14 +6,9 @@
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import ffmpegStaticRaw from 'ffmpeg-static'
-import ffprobeStaticRaw from 'ffprobe-static'
+import { ffmpegPath as ffmpegStatic, ffprobePath } from './paths'
 
-// Fix asar path for packaged Electron apps (binaries are in app.asar.unpacked)
-const ffmpegStatic = ffmpegStaticRaw?.replace('app.asar', 'app.asar.unpacked') ?? null
-const ffprobeStatic = ffprobeStaticRaw?.path
-  ? { path: ffprobeStaticRaw.path.replace('app.asar', 'app.asar.unpacked') }
-  : null
+const ffprobeStatic = ffprobePath ? { path: ffprobePath } : null
 
 export interface WaveformData {
   peaks: number[] // Normalized peaks (0-1 range)

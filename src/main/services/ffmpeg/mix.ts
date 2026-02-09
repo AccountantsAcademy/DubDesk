@@ -3,7 +3,10 @@
  * Splice dubbed audio segments with original audio (clean switching, no ducking)
  */
 
-import { mkdir, stat } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { writeFileSync } from 'node:fs'
+import { mkdir, stat, unlink } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import ffmpeg from 'fluent-ffmpeg'
 
@@ -249,59 +252,99 @@ export async function mixAudio(
     const filterString = filters.join(';')
     console.log(`[FFmpeg:Mix] Splice filter (${filters.length} filters, ${pieces.length} pieces)`)
 
-    command.complexFilter(filterString, ['out']).audioFrequency(sampleRate).audioChannels(2)
+    // Estimate total command line length: inputs (~85 chars each) + filter string + overhead
+    const estimatedInputLength = inputIndex * 85
+    const estimatedCmdLength = estimatedInputLength + filterString.length + 500
+    const CMD_LIMIT = 28_000 // Safe threshold below Windows 32K limit
 
-    switch (format) {
-      case 'wav':
-        command = command.audioCodec('pcm_s16le').format('wav')
-        break
-      case 'mp3':
-        command = command.audioCodec('libmp3lame').audioBitrate('192k').format('mp3')
-        break
-      case 'aac':
-        command = command.audioCodec('aac').audioBitrate('192k').format('m4a')
-        break
+    let filterScriptPath: string | null = null
+
+    const cleanupFilterScript = async (): Promise<void> => {
+      if (filterScriptPath) {
+        try {
+          await unlink(filterScriptPath)
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
     }
 
-    let durationMs = 0
-    let lastProgressPercent = 0
+    try {
+      if (estimatedCmdLength > CMD_LIMIT) {
+        // Write filter graph to temp file to avoid ENAMETOOLONG on Windows
+        filterScriptPath = path.join(tmpdir(), `dubdesk-filter-${randomUUID()}.txt`)
+        writeFileSync(filterScriptPath, filterString, 'utf-8')
+        console.log(
+          `[FFmpeg:Mix] Filter too long (${filterString.length} chars), using script:`,
+          filterScriptPath
+        )
+        command = command
+          .outputOptions('-filter_complex_script', filterScriptPath)
+          .outputOptions('-map', '[out]')
+      } else {
+        command.complexFilter(filterString, ['out'])
+      }
 
-    command
-      .on('start', (cmdline) => {
-        console.log('[FFmpeg:Mix] Command:', `${cmdline.substring(0, 500)}...`)
-      })
-      .on('stderr', (line) => {
-        if (line.includes('Error') || line.includes('error')) {
-          console.error('[FFmpeg:Mix] stderr:', line)
-        }
-      })
-      .on('codecData', (data) => {
-        if (data.duration) {
-          const parts = data.duration.split(':').map(Number)
-          if (parts.length === 3) {
-            durationMs = (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000
+      command.audioFrequency(sampleRate).audioChannels(2)
+
+      switch (format) {
+        case 'wav':
+          command = command.audioCodec('pcm_s16le').format('wav')
+          break
+        case 'mp3':
+          command = command.audioCodec('libmp3lame').audioBitrate('192k').format('mp3')
+          break
+        case 'aac':
+          command = command.audioCodec('aac').audioBitrate('192k').format('m4a')
+          break
+      }
+
+      let durationMs = 0
+      let lastProgressPercent = 0
+
+      command
+        .on('start', (cmdline) => {
+          console.log('[FFmpeg:Mix] Command:', `${cmdline.substring(0, 500)}...`)
+        })
+        .on('stderr', (line) => {
+          if (line.includes('Error') || line.includes('error')) {
+            console.error('[FFmpeg:Mix] stderr:', line)
           }
-        }
+        })
+        .on('codecData', (data) => {
+          if (data.duration) {
+            const parts = data.duration.split(':').map(Number)
+            if (parts.length === 3) {
+              durationMs = (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000
+            }
+          }
+        })
+        .on('progress', (progress) => {
+          const percent = progress.percent || 0
+          if (percent - lastProgressPercent >= 10) {
+            console.log(`[FFmpeg:Mix] Progress: ${percent.toFixed(1)}%`)
+            lastProgressPercent = percent
+          }
+          if (onProgress && percent > 0) {
+            onProgress(percent)
+          }
+        })
+        .on('end', async () => {
+          await cleanupFilterScript()
+          console.log('[FFmpeg:Mix] Complete:', outputPath)
+          resolve({ outputPath, durationMs })
+        })
+        .on('error', async (err) => {
+          await cleanupFilterScript()
+          console.error('[FFmpeg:Mix] Error:', err)
+          reject(new Error(`Audio mixing failed: ${err.message}`))
+        })
+        .save(outputPath)
+    } catch (err) {
+      cleanupFilterScript().finally(() => {
+        reject(err instanceof Error ? err : new Error(String(err)))
       })
-      .on('progress', (progress) => {
-        const percent = progress.percent || 0
-        if (percent - lastProgressPercent >= 10) {
-          console.log(`[FFmpeg:Mix] Progress: ${percent.toFixed(1)}%`)
-          lastProgressPercent = percent
-        }
-        if (onProgress && percent > 0) {
-          onProgress(percent)
-        }
-      })
-      .on('end', () => {
-        console.log('[FFmpeg:Mix] Complete:', outputPath)
-        resolve({ outputPath, durationMs })
-      })
-      .on('error', (err) => {
-        console.error('[FFmpeg:Mix] Error:', err)
-        reject(new Error(`Audio mixing failed: ${err.message}`))
-      })
-      .save(outputPath)
+    }
   })
 }
 

@@ -4,20 +4,10 @@
  */
 
 import { rename, unlink } from 'node:fs/promises'
-import ffmpegStatic from 'ffmpeg-static'
-import ffprobeStatic from 'ffprobe-static'
 import ffmpeg from 'fluent-ffmpeg'
 
-// Fix asar path for packaged Electron apps (binaries are in app.asar.unpacked)
-const ffmpegPath = ffmpegStatic?.replace('app.asar', 'app.asar.unpacked')
-const ffprobePath = ffprobeStatic?.path?.replace('app.asar', 'app.asar.unpacked')
-
-if (ffmpegPath) {
-  ffmpeg.setFfmpegPath(ffmpegPath)
-}
-if (ffprobePath) {
-  ffmpeg.setFfprobePath(ffprobePath)
-}
+// Ensure FFmpeg paths are initialized
+import './paths'
 
 /**
  * Get the duration of an audio file in milliseconds
@@ -135,39 +125,43 @@ export async function stretchAudioToDuration(
   const tempOutput = isSameFile ? `${outputPath}.stretched.tmp.mp3` : outputPath
 
   return new Promise((resolve, reject) => {
-    ffmpeg(inputPath)
-      .audioFilters(atempoFilter)
-      .audioCodec('libmp3lame')
-      .audioBitrate('128k')
-      .on('start', (cmd) => {
-        console.log(`[FFmpeg:Stretch] Running: ${cmd}`)
-      })
-      .on('error', (err) => {
-        console.error(`[FFmpeg:Stretch] Error:`, err)
-        reject(new Error(`Failed to stretch audio: ${err.message}`))
-      })
-      .on('end', async () => {
-        console.log(`[FFmpeg:Stretch] FFmpeg completed, verifying output...`)
-        try {
-          // Get final duration
-          const finalDurationMs = await getAudioDuration(tempOutput)
+    try {
+      ffmpeg(inputPath)
+        .audioFilters(atempoFilter)
+        .audioCodec('libmp3lame')
+        .audioBitrate('128k')
+        .on('start', (cmd) => {
+          console.log(`[FFmpeg:Stretch] Running: ${cmd}`)
+        })
+        .on('error', (err) => {
+          console.error(`[FFmpeg:Stretch] Error:`, err)
+          reject(new Error(`Failed to stretch audio: ${err.message}`))
+        })
+        .on('end', async () => {
+          console.log(`[FFmpeg:Stretch] FFmpeg completed, verifying output...`)
+          try {
+            // Get final duration
+            const finalDurationMs = await getAudioDuration(tempOutput)
 
-          // If same file, replace original with stretched version
-          if (isSameFile) {
-            await unlink(inputPath)
-            await rename(tempOutput, outputPath)
+            // If same file, replace original with stretched version
+            if (isSameFile) {
+              await unlink(inputPath)
+              await rename(tempOutput, outputPath)
+            }
+
+            resolve({
+              outputPath,
+              originalDurationMs,
+              finalDurationMs,
+              speedRatio
+            })
+          } catch (err) {
+            reject(err)
           }
-
-          resolve({
-            outputPath,
-            originalDurationMs,
-            finalDurationMs,
-            speedRatio
-          })
-        } catch (err) {
-          reject(err)
-        }
-      })
-      .save(tempOutput)
+        })
+        .save(tempOutput)
+    } catch (err) {
+      reject(err instanceof Error ? err : new Error(String(err)))
+    }
   })
 }

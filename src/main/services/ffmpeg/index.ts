@@ -3,20 +3,10 @@
  * Main entry point for FFmpeg audio/video operations
  */
 
-import ffmpegStatic from 'ffmpeg-static'
-import ffprobeStatic from 'ffprobe-static'
 import ffmpeg from 'fluent-ffmpeg'
 
-// Fix asar path for packaged Electron apps (binaries are in app.asar.unpacked)
-const ffmpegPath = ffmpegStatic?.replace('app.asar', 'app.asar.unpacked')
-const ffprobePath = ffprobeStatic?.path?.replace('app.asar', 'app.asar.unpacked')
-
-if (ffmpegPath) {
-  ffmpeg.setFfmpegPath(ffmpegPath)
-}
-if (ffprobePath) {
-  ffmpeg.setFfprobePath(ffprobePath)
-}
+// Initialize FFmpeg paths (side effect: sets ffmpeg/ffprobe paths)
+import './paths'
 
 export * from './export'
 export * from './extract'

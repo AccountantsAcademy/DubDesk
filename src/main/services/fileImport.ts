@@ -7,12 +7,10 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { BrowserWindow, dialog } from 'electron'
-import ffmpegStaticRaw from 'ffmpeg-static'
-import ffprobeStaticRaw from 'ffprobe-static'
+import { ffmpegPath, ffprobePath } from './ffmpeg/paths'
 
-// Fix asar path for packaged Electron apps (binaries are in app.asar.unpacked)
-const ffmpegBin = ffmpegStaticRaw?.replace('app.asar', 'app.asar.unpacked') ?? 'ffmpeg'
-const ffprobeBin = ffprobeStaticRaw?.path?.replace('app.asar', 'app.asar.unpacked') ?? 'ffprobe'
+const ffmpegBin = ffmpegPath ?? 'ffmpeg'
+const ffprobeBin = ffprobePath ?? 'ffprobe'
 
 export interface VideoMetadata {
   duration: number // in milliseconds
