@@ -150,7 +150,12 @@ export function Playhead(): React.JSX.Element {
     )
 
     // Initialize
-    const { currentTimeMs, state: playState, playbackRate: rate, durationMs } = usePlaybackStore.getState()
+    const {
+      currentTimeMs,
+      state: playState,
+      playbackRate: rate,
+      durationMs
+    } = usePlaybackStore.getState()
     isCurrentlyPlaying = playState === 'playing'
     playbackRate = rate
     cachedDurationMs = durationMs

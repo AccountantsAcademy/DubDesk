@@ -3,12 +3,14 @@
  * Splice dubbed audio segments with original audio (clean switching, no ducking)
  */
 
+import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
-import { mkdir, stat, unlink } from 'node:fs/promises'
+import { mkdir, readdir, rmdir, stat, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import ffmpeg from 'fluent-ffmpeg'
+import { ffmpegPath } from './paths'
 
 /**
  * Get audio duration using ffprobe with timeout
@@ -68,6 +70,255 @@ export interface MixResult {
   durationMs: number
 }
 
+/** Threshold: use two-phase concat-demuxer when segment count exceeds this */
+const CONCAT_DEMUXER_THRESHOLD = 50
+
+interface OriginalPiece {
+  type: 'original'
+  startMs: number
+  endMs: number
+}
+interface SegmentPiece {
+  type: 'segment'
+  audioPath: string
+  volume: number
+  startTimeMs: number
+  endTimeMs: number
+}
+interface SilencePiece {
+  type: 'silence'
+  durationMs: number
+}
+type Piece = OriginalPiece | SegmentPiece | SilencePiece
+
+/**
+ * Run a single ffmpeg command via spawn. Returns a promise that resolves on exit code 0.
+ */
+function runFfmpeg(args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (!ffmpegPath) {
+      reject(new Error('FFmpeg binary not found'))
+      return
+    }
+    const proc = spawn(ffmpegPath, args)
+    let stderr = ''
+    proc.stderr.on('data', (data) => {
+      stderr += data.toString()
+    })
+    proc.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`FFmpeg exited with code ${code}: ${stderr.slice(-500)}`))
+      } else {
+        resolve()
+      }
+    })
+    proc.on('error', reject)
+  })
+}
+
+/**
+ * Extract a single piece to a WAV file for the concat-demuxer approach.
+ */
+async function extractPiece(
+  piece: Piece,
+  originalAudioPath: string,
+  outPath: string,
+  sampleRate: number,
+  originalVolume: number,
+  dubbedVolume: number
+): Promise<void> {
+  if (piece.type === 'original') {
+    const startSec = (piece.startMs / 1000).toFixed(3)
+    const endSec = (piece.endMs / 1000).toFixed(3)
+    await runFfmpeg([
+      '-i',
+      originalAudioPath,
+      '-ss',
+      startSec,
+      '-to',
+      endSec,
+      '-af',
+      `volume=${originalVolume}`,
+      '-ar',
+      String(sampleRate),
+      '-ac',
+      '2',
+      '-c:a',
+      'pcm_s16le',
+      '-y',
+      outPath
+    ])
+  } else if (piece.type === 'silence') {
+    const durationSec = (piece.durationMs / 1000).toFixed(3)
+    await runFfmpeg([
+      '-f',
+      'lavfi',
+      '-i',
+      `anullsrc=r=${sampleRate}:cl=stereo`,
+      '-t',
+      durationSec,
+      '-c:a',
+      'pcm_s16le',
+      '-y',
+      outPath
+    ])
+  } else {
+    const effectiveVolume = dubbedVolume * piece.volume
+    const segDurSec = ((piece.endTimeMs - piece.startTimeMs) / 1000).toFixed(3)
+    await runFfmpeg([
+      '-i',
+      piece.audioPath,
+      '-af',
+      `volume=${effectiveVolume},apad=whole_dur=${segDurSec},atrim=0:${segDurSec}`,
+      '-ar',
+      String(sampleRate),
+      '-ac',
+      '2',
+      '-c:a',
+      'pcm_s16le',
+      '-y',
+      outPath
+    ])
+  }
+}
+
+/**
+ * Concatenate piece WAV files using the concat demuxer (no command-line length issues).
+ */
+async function concatPieces(
+  pieceFiles: string[],
+  outputPath: string,
+  format: 'wav' | 'mp3' | 'aac'
+): Promise<void> {
+  const listContent = pieceFiles.map((f) => `file '${f.replace(/'/g, "'\\''")}'`).join('\n')
+  const listPath = path.join(path.dirname(pieceFiles[0]), 'concat-list.txt')
+  writeFileSync(listPath, listContent, 'utf-8')
+
+  const args = ['-f', 'concat', '-safe', '0', '-i', listPath]
+
+  switch (format) {
+    case 'wav':
+      args.push('-c:a', 'pcm_s16le', '-f', 'wav')
+      break
+    case 'mp3':
+      args.push('-c:a', 'libmp3lame', '-b:a', '192k', '-f', 'mp3')
+      break
+    case 'aac':
+      args.push('-c:a', 'aac', '-b:a', '192k', '-f', 'm4a')
+      break
+  }
+
+  args.push('-y', outputPath)
+  await runFfmpeg(args)
+}
+
+/**
+ * Run async tasks with limited concurrency.
+ */
+async function parallelLimit<T>(tasks: (() => Promise<T>)[], limit: number): Promise<T[]> {
+  const results: T[] = new Array(tasks.length)
+  let nextIndex = 0
+
+  async function worker() {
+    while (nextIndex < tasks.length) {
+      const idx = nextIndex++
+      results[idx] = await tasks[idx]()
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(limit, tasks.length) }, () => worker())
+  await Promise.all(workers)
+  return results
+}
+
+/**
+ * Two-phase concat-demuxer mix for large segment counts.
+ * Phase 1: Extract each piece to an individual WAV (parallelized).
+ * Phase 2: Concatenate all pieces via concat demuxer.
+ */
+async function mixAudioConcatDemuxer(
+  originalAudioPath: string,
+  pieces: Piece[],
+  outputPath: string,
+  options: MixOptions,
+  totalDurationMs: number,
+  onProgress?: (percent: number) => void
+): Promise<MixResult> {
+  const sampleRate = options.sampleRate ?? 44100
+  const format = options.format ?? 'wav'
+  const originalVolume = options.originalVolume ?? 0.3
+  const dubbedVolume = options.dubbedVolume ?? 1.0
+  const targetDurationMs = options.targetDurationMs
+
+  // Create temp directory for piece files
+  const tempDir = path.join(tmpdir(), `dubdesk-mix-${randomUUID()}`)
+  await mkdir(tempDir, { recursive: true })
+
+  const allPieces = [...pieces]
+
+  // Add silence padding piece if target duration exceeds total
+  if (targetDurationMs && targetDurationMs > totalDurationMs) {
+    const padMs = targetDurationMs - totalDurationMs
+    allPieces.push({ type: 'silence', durationMs: padMs })
+    console.log(
+      `[FFmpeg:Mix] Adding ${(padMs / 1000).toFixed(2)}s silence to reach target duration`
+    )
+  }
+
+  const pieceFiles: string[] = allPieces.map((_, i) =>
+    path.join(tempDir, `piece_${String(i).padStart(5, '0')}.wav`)
+  )
+
+  let completedCount = 0
+  const totalCount = allPieces.length
+
+  try {
+    // Phase 1: Extract each piece in parallel (limit 8)
+    console.log(`[FFmpeg:Mix] Phase 1: Extracting ${totalCount} pieces (concat-demuxer mode)`)
+    const tasks = allPieces.map(
+      (piece, i) => () =>
+        extractPiece(
+          piece,
+          originalAudioPath,
+          pieceFiles[i],
+          sampleRate,
+          originalVolume,
+          dubbedVolume
+        ).then(() => {
+          completedCount++
+          const pct = (completedCount / totalCount) * 90 // Reserve 10% for concat
+          if (onProgress) onProgress(pct)
+        })
+    )
+    await parallelLimit(tasks, 8)
+
+    // Phase 2: Concatenate all pieces
+    console.log(`[FFmpeg:Mix] Phase 2: Concatenating ${totalCount} pieces`)
+    if (onProgress) onProgress(92)
+    await concatPieces(pieceFiles, outputPath, format)
+    if (onProgress) onProgress(100)
+
+    console.log('[FFmpeg:Mix] Complete (concat-demuxer):', outputPath)
+    // Approximate duration from pieces
+    let durationMs = 0
+    for (const piece of allPieces) {
+      if (piece.type === 'original') durationMs += piece.endMs - piece.startMs
+      else if (piece.type === 'silence') durationMs += piece.durationMs
+      else durationMs += piece.endTimeMs - piece.startTimeMs
+    }
+    return { outputPath, durationMs }
+  } finally {
+    // Clean up temp directory
+    try {
+      const files = await readdir(tempDir)
+      await Promise.all(files.map((f) => unlink(path.join(tempDir, f)).catch(() => {})))
+      await rmdir(tempDir).catch(() => {})
+    } catch {
+      console.warn('[FFmpeg:Mix] Failed to clean up temp dir:', tempDir)
+    }
+  }
+}
+
 /**
  * Mix dubbed audio segments with original audio using splice approach
  * Cleanly switches between original audio (in gaps) and dubbed audio (in segments)
@@ -119,24 +370,6 @@ export async function mixAudio(
   console.log(`[FFmpeg:Mix] Splicing ${sortedSegments.length} segments into original audio`)
 
   // Build list of pieces to concatenate: [gap, segment, gap, segment, ...]
-  interface OriginalPiece {
-    type: 'original'
-    startMs: number
-    endMs: number
-  }
-  interface SegmentPiece {
-    type: 'segment'
-    audioPath: string
-    volume: number
-    startTimeMs: number
-    endTimeMs: number
-  }
-  interface SilencePiece {
-    type: 'silence'
-    durationMs: number
-  }
-  type Piece = OriginalPiece | SegmentPiece | SilencePiece
-
   const minGapMs = options.minGapForOriginalMs ?? 0 // 0 means always use original audio
   const pieces: Piece[] = []
   let currentMs = 0
@@ -184,7 +417,23 @@ export async function mixAudio(
 
   console.log(`[FFmpeg:Mix] Built ${pieces.length} pieces for concatenation`)
 
-  // Build FFmpeg filter to extract and concatenate all pieces
+  // For many segments, use the two-phase concat-demuxer approach to avoid
+  // ENAMETOOLONG from too many -i arguments on the command line
+  if (segments.length > CONCAT_DEMUXER_THRESHOLD) {
+    console.log(
+      `[FFmpeg:Mix] Using concat-demuxer approach (${segments.length} segments > ${CONCAT_DEMUXER_THRESHOLD} threshold)`
+    )
+    return mixAudioConcatDemuxer(
+      originalAudioPath,
+      pieces,
+      outputPath,
+      options,
+      totalDurationMs,
+      onProgress
+    )
+  }
+
+  // Standard single-command approach for smaller segment counts
   return new Promise((resolve, reject) => {
     let command = ffmpeg(originalAudioPath)
 
