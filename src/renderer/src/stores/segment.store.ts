@@ -592,7 +592,7 @@ export const useSegmentStore = create<SegmentStore>()(
           }
 
           set({
-            segments: segments.map((s) =>
+            segments: get().segments.map((s) =>
               s.id === id ? { ...s, lipsyncVideoPath: response.data.lipsyncVideoPath } : s
             ),
             isGenerating: false

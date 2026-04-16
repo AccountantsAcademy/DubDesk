@@ -12,6 +12,8 @@ import type { ImageOverlay } from '@shared/types/overlay'
 import type React from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+type PendingTimes = { startTimeMs: number; endTimeMs: number }
+
 interface OverlayItemProps {
   overlay: ImageOverlay
   trackHeight: number
@@ -20,10 +22,12 @@ interface OverlayItemProps {
 export function OverlayItem({ overlay }: OverlayItemProps): React.JSX.Element {
   const [isDragging, setIsDragging] = useState(false)
   const [isResizing, setIsResizing] = useState<'start' | 'end' | null>(null)
-  const [pendingTimes, setPendingTimes] = useState<{
-    startTimeMs: number
-    endTimeMs: number
-  } | null>(null)
+  const [pendingTimes, setPendingTimesState] = useState<PendingTimes | null>(null)
+  const pendingTimesRef = useRef<PendingTimes | null>(null)
+  const setPendingTimes = useCallback((val: PendingTimes | null) => {
+    pendingTimesRef.current = val
+    setPendingTimesState(val)
+  }, [])
 
   const dragStartRef = useRef<{ mouseX: number; startTimeMs: number; endTimeMs: number } | null>(
     null
@@ -111,10 +115,11 @@ export function OverlayItem({ overlay }: OverlayItemProps): React.JSX.Element {
 
     const handleMouseUp = () => {
       setIsDragging(false)
-      if (pendingTimes) {
+      const p = pendingTimesRef.current
+      if (p) {
         updateOverlay(overlay.id, {
-          startTimeMs: Math.round(pendingTimes.startTimeMs),
-          endTimeMs: Math.round(pendingTimes.endTimeMs)
+          startTimeMs: Math.round(p.startTimeMs),
+          endTimeMs: Math.round(p.endTimeMs)
         })
         setPendingTimes(null)
       }
@@ -127,7 +132,7 @@ export function OverlayItem({ overlay }: OverlayItemProps): React.JSX.Element {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [isDragging, durationMs, pendingTimes, overlay.id, pixelsToMs, updateOverlay])
+  }, [isDragging, durationMs, overlay.id, pixelsToMs, updateOverlay, setPendingTimes])
 
   // --- Edge resize ---
   const handleEdgeMouseDown = useCallback(
@@ -170,10 +175,11 @@ export function OverlayItem({ overlay }: OverlayItemProps): React.JSX.Element {
 
     const handleMouseUp = () => {
       setIsResizing(null)
-      if (pendingTimes) {
+      const p = pendingTimesRef.current
+      if (p) {
         updateOverlay(overlay.id, {
-          startTimeMs: Math.round(pendingTimes.startTimeMs),
-          endTimeMs: Math.round(pendingTimes.endTimeMs)
+          startTimeMs: Math.round(p.startTimeMs),
+          endTimeMs: Math.round(p.endTimeMs)
         })
         setPendingTimes(null)
       }
@@ -186,7 +192,7 @@ export function OverlayItem({ overlay }: OverlayItemProps): React.JSX.Element {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [isResizing, durationMs, pendingTimes, overlay.id, pixelsToMs, updateOverlay])
+  }, [isResizing, durationMs, overlay.id, pixelsToMs, updateOverlay, setPendingTimes])
 
   return (
     <div

@@ -189,11 +189,12 @@ export async function downloadLipsyncResult(
     throw new Error(`Failed to download lip-sync result (${response.status})`)
   }
 
-  const arrayBuffer = await response.arrayBuffer()
-  const buffer = Buffer.from(arrayBuffer)
+  if (!response.body) {
+    throw new Error('Response body is empty')
+  }
 
   const writeStream = createWriteStream(outputPath)
-  const readable = Readable.from(buffer)
+  const readable = Readable.fromWeb(response.body as import('node:stream/web').ReadableStream)
   await pipeline(readable, writeStream)
 
   const fileStat = await stat(outputPath)

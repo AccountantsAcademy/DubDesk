@@ -29,6 +29,8 @@ interface QuickDubState {
   skipLipsync: boolean
   isProcessing: boolean
   error: string | null
+  /** Incremented on cancel to invalidate in-flight async operations */
+  generation: number
 }
 
 interface QuickDubActions {
@@ -71,7 +73,8 @@ const initialState: QuickDubState = {
   lipsyncVideoPath: null,
   skipLipsync: false,
   isProcessing: false,
-  error: null
+  error: null,
+  generation: 0
 }
 
 export const useQuickDubStore = create<QuickDubStore>()(
@@ -80,6 +83,7 @@ export const useQuickDubStore = create<QuickDubStore>()(
       ...initialState,
 
       startQuickDub: async (startMs, endMs, projectId, audioPath, language) => {
+        const gen = get().generation + 1
         set({
           step: 'transcribing',
           rangeStartMs: startMs,
@@ -90,7 +94,8 @@ export const useQuickDubStore = create<QuickDubStore>()(
           editedText: '',
           generatedSegmentId: null,
           generatedAudioPath: null,
-          lipsyncVideoPath: null
+          lipsyncVideoPath: null,
+          generation: gen
         })
 
         try {
@@ -101,6 +106,8 @@ export const useQuickDubStore = create<QuickDubStore>()(
             endTimeMs: endMs,
             language
           })
+
+          if (get().generation !== gen) return // cancelled
 
           if (!response.success) {
             throw new Error(response.error || 'Transcription failed')
@@ -114,6 +121,7 @@ export const useQuickDubStore = create<QuickDubStore>()(
             isProcessing: false
           })
         } catch (error) {
+          if (get().generation !== gen) return // cancelled
           set({
             step: 'error',
             isProcessing: false,
@@ -127,7 +135,7 @@ export const useQuickDubStore = create<QuickDubStore>()(
       setSkipLipsync: (skip) => set({ skipLipsync: skip }),
 
       generateAudio: async (projectId, audioPath, videoPath, projectName) => {
-        const { editedText, rangeStartMs, rangeEndMs } = get()
+        const { editedText, rangeStartMs, rangeEndMs, generation: gen } = get()
 
         if (!editedText.trim() || rangeStartMs === null || rangeEndMs === null) {
           set({ error: 'Missing text or range', step: 'error' })
@@ -143,6 +151,8 @@ export const useQuickDubStore = create<QuickDubStore>()(
             audioPath,
             voiceName: `${projectName} - Quick Dub Voice`
           })
+
+          if (get().generation !== gen) return // cancelled
 
           if (!cloneResponse.success) {
             throw new Error(cloneResponse.error || 'Voice cloning failed')
@@ -162,6 +172,8 @@ export const useQuickDubStore = create<QuickDubStore>()(
             endTimeMs: rangeEndMs
           })
 
+          if (get().generation !== gen) return // cancelled
+
           if (!generateResponse.success) {
             throw new Error(generateResponse.error || 'Audio generation failed')
           }
@@ -176,6 +188,8 @@ export const useQuickDubStore = create<QuickDubStore>()(
             set({ step: 'complete', isProcessing: false })
             return
           }
+
+          if (get().generation !== gen) return // cancelled
 
           set({ step: 'lipsyncing' })
 
@@ -200,11 +214,14 @@ export const useQuickDubStore = create<QuickDubStore>()(
             console.log('[QuickDub] Lip-sync skipped or failed, completing with audio only')
           }
 
+          if (get().generation !== gen) return // cancelled
+
           set({
             step: 'complete',
             isProcessing: false
           })
         } catch (error) {
+          if (get().generation !== gen) return // cancelled
           set({
             step: 'error',
             isProcessing: false,

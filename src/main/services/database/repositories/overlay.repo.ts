@@ -59,6 +59,12 @@ export const overlayRepository = {
     const db = getDatabase()
     const id = uuidv4()
 
+    // Validate projectId to prevent path traversal
+    const sanitizedProjectId = path.basename(data.projectId)
+    if (sanitizedProjectId !== data.projectId || data.projectId.includes('..')) {
+      throw new Error('Invalid project ID')
+    }
+
     // Copy image to project directory
     const projectDir = path.join(app.getPath('userData'), 'projects', data.projectId)
     const overlaysDir = path.join(projectDir, 'overlays')
@@ -71,11 +77,21 @@ export const overlayRepository = {
     const destPath = path.join(overlaysDir, `${id}${ext}`)
     copyFileSync(data.sourceImagePath, destPath)
 
-    const stmt = db.prepare(`
-      INSERT INTO image_overlays (id, project_id, image_path, original_filename, start_time_ms, end_time_ms)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `)
-    stmt.run(id, data.projectId, destPath, originalFilename, data.startTimeMs, data.endTimeMs)
+    try {
+      const stmt = db.prepare(`
+        INSERT INTO image_overlays (id, project_id, image_path, original_filename, start_time_ms, end_time_ms)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `)
+      stmt.run(id, data.projectId, destPath, originalFilename, data.startTimeMs, data.endTimeMs)
+    } catch (err) {
+      // Clean up copied file if DB insert fails
+      try {
+        unlinkSync(destPath)
+      } catch {
+        // Ignore cleanup errors
+      }
+      throw err
+    }
 
     return this.findById(id)!
   },

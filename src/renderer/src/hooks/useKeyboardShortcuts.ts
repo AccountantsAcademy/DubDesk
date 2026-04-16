@@ -39,9 +39,11 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
     if (!enabled) return
 
     const handleKeyDown = (e: KeyboardEvent): void => {
-      // Skip if typing in an input or textarea
+      // Allow Escape even when focused on input/textarea
       const target = e.target as HTMLElement
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      const isTextInput =
+        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+      if (isTextInput && e.code !== 'Escape') {
         return
       }
 

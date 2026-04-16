@@ -1,3 +1,4 @@
+import { usePlaybackStore } from '@renderer/stores/playback.store'
 import { useTimelineStore } from '@renderer/stores/timeline.store'
 import type React from 'react'
 import { useCallback, useEffect, useState } from 'react'
@@ -28,7 +29,8 @@ export function RangeSelection(): React.JSX.Element | null {
 
       const rect = scrollContainer.getBoundingClientRect()
       const clickX = e.clientX - rect.left + scrollContainer.scrollLeft - 80
-      const timeMs = Math.max(0, pixelsToMs(Math.max(0, clickX)))
+      const durationMs = usePlaybackStore.getState().durationMs
+      const timeMs = Math.max(0, Math.min(pixelsToMs(Math.max(0, clickX)), durationMs))
 
       const { rangeStartMs: currentStart, rangeEndMs: currentEnd } = useTimelineStore.getState()
 

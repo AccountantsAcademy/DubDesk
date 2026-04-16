@@ -4,7 +4,7 @@
  */
 
 import { spawn } from 'node:child_process'
-import { rename, unlink } from 'node:fs/promises'
+import { rename } from 'node:fs/promises'
 import { ffmpegPath } from './paths'
 
 /**
@@ -27,12 +27,14 @@ export function measureMeanVolume(audioPath: string): Promise<number> {
     })
 
     proc.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`FFmpeg volumedetect failed (code ${code}): ${stderr.slice(-300)}`))
+        return
+      }
       // volumedetect outputs to stderr even on success
       const match = stderr.match(/mean_volume:\s*([-\d.]+)\s*dB/)
       if (match) {
         resolve(Number.parseFloat(match[1]))
-      } else if (code !== 0) {
-        reject(new Error(`FFmpeg volumedetect failed (code ${code}): ${stderr.slice(-300)}`))
       } else {
         reject(new Error('Could not parse mean_volume from FFmpeg output'))
       }
@@ -90,7 +92,6 @@ export async function adjustVolume(
   })
 
   if (isSameFile) {
-    await unlink(inputPath)
     await rename(tempPath, outputPath)
   }
 }
@@ -141,7 +142,6 @@ export async function trimSilence(inputPath: string, outputPath: string): Promis
   })
 
   if (isSameFile) {
-    await unlink(inputPath)
     await rename(tempPath, outputPath)
   }
 

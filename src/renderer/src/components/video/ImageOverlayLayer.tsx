@@ -30,11 +30,11 @@ function computeVideoRect(
   let displayH: number
 
   if (videoAspect > containerAspect) {
-    // Video is wider — pillarboxed (bars top/bottom)
+    // Video is wider — letterboxed (bars top/bottom)
     displayW = containerW
     displayH = containerW / videoAspect
   } else {
-    // Video is taller — letterboxed (bars left/right)
+    // Video is taller — pillarboxed (bars left/right)
     displayH = containerH
     displayW = containerH * videoAspect
   }
@@ -297,7 +297,7 @@ function OverlayImage({
         onUpdate(overlay.id, {
           positionX: p.positionX,
           positionY: p.positionY
-        })
+        }).catch(console.error)
         setPending(null)
       }
       dragStartRef.current = null
@@ -397,7 +397,7 @@ function OverlayImage({
           positionY: p.positionY,
           widthFraction: p.widthFraction,
           heightFraction: p.heightFraction
-        })
+        }).catch(console.error)
         setPending(null)
       }
       dragStartRef.current = null

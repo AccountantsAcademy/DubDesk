@@ -75,7 +75,8 @@ export function QuickDubModal(): React.JSX.Element | null {
         setOriginalAudioVolume(1.0)
         setDubbedAudioVolume(1.0)
       } else {
-        setDubbedAudioVolume(usePlaybackStore.getState().originalAudioVolume)
+        setOriginalAudioVolume(0.3)
+        setDubbedAudioVolume(1.0)
       }
 
       addToast('success', 'Quick Edit segment added to timeline')

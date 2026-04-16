@@ -36,8 +36,8 @@ export function LipsyncOverlay(): React.JSX.Element | null {
     const video = lipsyncVideoRef.current
     if (!video) return
 
-    if (lipsyncSrc && playingDubbedSegmentId !== activeSegmentIdRef.current) {
-      // New lip-sync segment — load and play from the start
+    if (lipsyncSrc && (playingDubbedSegmentId !== activeSegmentIdRef.current || video.src !== lipsyncSrc)) {
+      // New lip-sync segment or re-entering same segment — load and play from the start
       activeSegmentIdRef.current = playingDubbedSegmentId
 
       video.src = lipsyncSrc
@@ -104,7 +104,7 @@ export function LipsyncOverlay(): React.JSX.Element | null {
     <video
       ref={lipsyncVideoRef}
       data-lipsync="true"
-      className="absolute inset-0 w-full h-full object-contain z-10"
+      className="absolute inset-0 w-full h-full object-contain z-10 pointer-events-none"
       muted
       playsInline
     />

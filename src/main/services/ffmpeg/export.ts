@@ -897,8 +897,9 @@ export async function spliceVideo(
   options: ExportOptions = {},
   onProgress?: (progress: { percent: number }) => void
 ): Promise<ExportResult> {
-  // Verify inputs
-  for (const filePath of [originalVideoPath, mixedAudioPath]) {
+  // Verify inputs (including lipsync video paths)
+  const filesToCheck = [originalVideoPath, mixedAudioPath, ...lipsyncSegments.map((s) => s.lipsyncVideoPath)]
+  for (const filePath of filesToCheck) {
     try {
       await stat(filePath)
     } catch {
@@ -933,8 +934,12 @@ export async function spliceVideo(
   let currentMs = 0
 
   for (const seg of sorted) {
-    if (seg.startTimeMs > currentMs) {
-      pieces.push({ type: 'original', startMs: currentMs, endMs: seg.startTimeMs })
+    // Skip segments fully contained within already-covered range
+    if (seg.endTimeMs <= currentMs) continue
+
+    const effectiveStart = Math.max(seg.startTimeMs, currentMs)
+    if (effectiveStart > currentMs) {
+      pieces.push({ type: 'original', startMs: currentMs, endMs: effectiveStart })
     }
     pieces.push({
       type: 'lipsync',
@@ -942,7 +947,7 @@ export async function spliceVideo(
       startMs: seg.startTimeMs,
       endMs: seg.endTimeMs
     })
-    currentMs = seg.endTimeMs
+    currentMs = Math.max(currentMs, seg.endTimeMs)
   }
 
   if (currentMs < totalDurationMs) {

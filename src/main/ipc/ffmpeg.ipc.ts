@@ -223,33 +223,35 @@ export function registerFFmpegHandlers(): void {
 
         if (hasOverlays) {
           // Apply image overlays (re-encodes video)
-          const result = await exportVideoWithOverlays(
-            videoInputPath,
-            data.audioPath,
-            data.outputPath,
-            imageOverlays,
-            videoWidth,
-            videoHeight,
-            data.options,
-            (progress) => {
-              if (window) {
-                const basePercent = hasLipsync ? 60 : 0
-                const range = hasLipsync ? 40 : 100
-                window.webContents.send(FFMPEG.EXPORT_PROGRESS, {
-                  stage: 'encoding',
-                  percent: basePercent + progress.percent * (range / 100)
-                })
+          try {
+            const result = await exportVideoWithOverlays(
+              videoInputPath,
+              data.audioPath,
+              data.outputPath,
+              imageOverlays,
+              videoWidth,
+              videoHeight,
+              data.options,
+              (progress) => {
+                if (window) {
+                  const basePercent = hasLipsync ? 60 : 0
+                  const range = hasLipsync ? 40 : 100
+                  window.webContents.send(FFMPEG.EXPORT_PROGRESS, {
+                    stage: 'encoding',
+                    percent: basePercent + progress.percent * (range / 100)
+                  })
+                }
               }
+            )
+
+            return { success: true, data: result }
+          } finally {
+            // Clean up intermediate file if we created one
+            if (videoInputPath !== data.videoPath) {
+              const { unlink } = await import('node:fs/promises')
+              unlink(videoInputPath).catch(() => {})
             }
-          )
-
-          // Clean up intermediate file if we created one
-          if (videoInputPath !== data.videoPath) {
-            const { unlink } = await import('node:fs/promises')
-            unlink(videoInputPath).catch(() => {})
           }
-
-          return { success: true, data: result }
         }
 
         // Fast path: just mux video + audio (no overlays, no lipsync)
