@@ -220,6 +220,34 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS.SET_ELEVENLABS_REGION, { region })
   },
 
+  // Quick Dub operations
+  quickDub: {
+    cloneVoice: (data: { projectId: string; audioPath: string; voiceName: string }) =>
+      ipcRenderer.invoke(IPC_CHANNELS.QUICK_DUB.CLONE_VOICE, data),
+    transcribeRange: (data: {
+      projectId: string
+      audioPath: string
+      startTimeMs: number
+      endTimeMs: number
+      language?: string
+    }) => ipcRenderer.invoke(IPC_CHANNELS.QUICK_DUB.TRANSCRIBE_RANGE, data),
+    generate: (data: {
+      projectId: string
+      text: string
+      voiceId: string
+      startTimeMs: number
+      endTimeMs: number
+    }) => ipcRenderer.invoke(IPC_CHANNELS.QUICK_DUB.GENERATE, data),
+    lipsync: (data: {
+      projectId: string
+      segmentId: string
+      videoPath: string
+      audioPath: string
+      startTimeMs: number
+      endTimeMs: number
+    }) => ipcRenderer.invoke(IPC_CHANNELS.QUICK_DUB.LIPSYNC, data)
+  },
+
   // History operations
   history: {
     undo: (projectId: string) => ipcRenderer.invoke(IPC_CHANNELS.HISTORY.UNDO, { projectId }),

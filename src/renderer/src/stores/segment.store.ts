@@ -73,6 +73,13 @@ interface SegmentActions {
   regenerateAllStaleAudio: () => Promise<void>
   markAudioGenerated: (id: string, hash: string) => void
 
+  // Lip-sync management
+  redoLipsync: (
+    id: string,
+    projectId: string,
+    videoPath: string
+  ) => Promise<void>
+
   setSegments: (segments: Segment[]) => void
   setSpeakers: (speakers: Speaker[]) => void
   clearError: () => void
@@ -564,6 +571,45 @@ export const useSegmentStore = create<SegmentStore>()(
               : s
           )
         })
+      },
+
+      redoLipsync: async (id, projectId, videoPath) => {
+        const { segments } = get()
+        const segment = segments.find((s) => s.id === id)
+        if (!segment || !segment.audioFilePath) {
+          throw new Error('Segment has no audio to lip-sync')
+        }
+
+        set({ isGenerating: true })
+        try {
+          const response = await window.dubdesk.quickDub.lipsync({
+            projectId,
+            segmentId: id,
+            videoPath,
+            audioPath: segment.audioFilePath,
+            startTimeMs: segment.startTimeMs,
+            endTimeMs: segment.endTimeMs
+          })
+
+          if (!response.success) {
+            throw new Error(response.error)
+          }
+
+          set({
+            segments: segments.map((s) =>
+              s.id === id
+                ? { ...s, lipsyncVideoPath: response.data.lipsyncVideoPath }
+                : s
+            ),
+            isGenerating: false
+          })
+        } catch (error) {
+          set({
+            error: error instanceof Error ? error.message : 'Failed to redo lip-sync',
+            isGenerating: false
+          })
+          throw error
+        }
       },
 
       setSegments: (segments) => set({ segments }),

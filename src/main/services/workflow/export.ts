@@ -11,7 +11,8 @@ import {
   type AudioExportOptions,
   type ExportOptions,
   exportAudioOnly,
-  exportVideo
+  exportVideo,
+  spliceVideo
 } from '../ffmpeg/export'
 import { type AudioSegment, type MixOptions, mixAudio } from '../ffmpeg/mix'
 import { setWorkflowState, type WorkflowProgress } from './index'
@@ -201,27 +202,72 @@ export async function runExportWorkflow(
     }
 
     // Video export (default)
-    onProgress?.({
-      stage: 'exporting',
-      progress: 50,
-      message: 'Encoding video...'
-    })
-
-    const result = await exportVideo(
-      project.sourceVideoPath!,
-      mixedAudioPath,
-      outputPath,
-      exportOptions || { videoCodec: 'copy', audioCodec: 'aac' },
-      (progress) => {
-        const percent = 50 + progress.percent * 0.5 // 50-100%
-        onProgress?.({
-          stage: 'exporting',
-          progress: percent,
-          message: `Encoding video... ${Math.round(progress.percent)}%`
-        })
-      },
-      projectId
+    // Check if any segments have lip-synced video clips
+    console.log(
+      `[Export] Checking ${segmentsWithAudio.length} segments for lipsync video:`,
+      segmentsWithAudio.map((s) => ({
+        id: s.id,
+        lipsyncVideoPath: s.lipsyncVideoPath || '(none)'
+      }))
     )
+    const lipsyncSegments = segmentsWithAudio
+      .filter((s) => s.lipsyncVideoPath)
+      .map((s) => ({
+        lipsyncVideoPath: s.lipsyncVideoPath!,
+        startTimeMs: s.startTimeMs,
+        endTimeMs: s.endTimeMs
+      }))
+    console.log(`[Export] Found ${lipsyncSegments.length} lip-synced segments`)
+
+    let result: { outputPath: string; durationMs: number; fileSize: number }
+
+    if (lipsyncSegments.length > 0) {
+      // Splice lip-synced video clips into the export
+      onProgress?.({
+        stage: 'exporting',
+        progress: 50,
+        message: `Splicing ${lipsyncSegments.length} lip-synced clip${lipsyncSegments.length > 1 ? 's' : ''}...`
+      })
+
+      result = await spliceVideo(
+        project.sourceVideoPath!,
+        lipsyncSegments,
+        mixedAudioPath,
+        outputPath,
+        exportOptions || { format: 'mp4' },
+        (progress) => {
+          const percent = 50 + progress.percent * 0.5 // 50-100%
+          onProgress?.({
+            stage: 'exporting',
+            progress: percent,
+            message: `Splicing video... ${Math.round(progress.percent)}%`
+          })
+        }
+      )
+    } else {
+      // Fast path: just mux original video + mixed audio (no re-encoding)
+      onProgress?.({
+        stage: 'exporting',
+        progress: 50,
+        message: 'Encoding video...'
+      })
+
+      result = await exportVideo(
+        project.sourceVideoPath!,
+        mixedAudioPath,
+        outputPath,
+        exportOptions || { videoCodec: 'copy', audioCodec: 'aac' },
+        (progress) => {
+          const percent = 50 + progress.percent * 0.5 // 50-100%
+          onProgress?.({
+            stage: 'exporting',
+            progress: percent,
+            message: `Encoding video... ${Math.round(progress.percent)}%`
+          })
+        },
+        projectId
+      )
+    }
 
     onProgress?.({
       stage: 'exporting',

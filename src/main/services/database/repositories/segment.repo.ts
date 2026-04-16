@@ -35,6 +35,7 @@ interface SegmentRow {
   translated_text_hash: string | null
   audio_generated_voice_id: string | null
   audio_generated_duration_ms: number | null
+  lipsync_video_path: string | null
   created_at: string
   updated_at: string
 }
@@ -62,6 +63,7 @@ function rowToSegment(row: SegmentRow): Segment {
     translatedTextHash: row.translated_text_hash ?? undefined,
     audioGeneratedVoiceId: row.audio_generated_voice_id ?? undefined,
     audioGeneratedDurationMs: row.audio_generated_duration_ms ?? undefined,
+    lipsyncVideoPath: row.lipsync_video_path ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   }
@@ -276,6 +278,11 @@ export const segmentRepository = {
     if (data.audioGeneratedDurationMs !== undefined) {
       updates.push('audio_generated_duration_ms = ?')
       values.push(data.audioGeneratedDurationMs)
+    }
+
+    if (data.lipsyncVideoPath !== undefined) {
+      updates.push('lipsync_video_path = ?')
+      values.push(data.lipsyncVideoPath)
     }
 
     if (updates.length === 0) {

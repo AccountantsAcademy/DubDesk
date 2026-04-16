@@ -1,4 +1,5 @@
 export { ExportSettingsModal } from './ExportSettingsModal'
 export { NewProjectModal } from './NewProjectModal'
+export { QuickDubModal } from './QuickDubModal'
 export { SettingsModal } from './SettingsModal'
 export { SpeakerManagerModal } from './SpeakerManagerModal'

@@ -11,6 +11,7 @@ import {
   cancelExport,
   type ExportOptions,
   type ExtractOptions,
+  type LipsyncSegment,
   exportAudioOnly,
   exportVideo,
   extractAudio,
@@ -19,7 +20,8 @@ import {
   type MixOptions,
   mixAudio,
   probeMedia,
-  saveWaveformCache
+  saveWaveformCache,
+  spliceVideo
 } from '../services/ffmpeg'
 
 export function registerFFmpegHandlers(): void {
@@ -125,7 +127,7 @@ export function registerFFmpegHandlers(): void {
     }
   )
 
-  // Export final video
+  // Export final video (with optional lip-sync video splicing)
   ipcMain.handle(
     FFMPEG.EXPORT,
     async (
@@ -136,12 +138,41 @@ export function registerFFmpegHandlers(): void {
         outputPath: string
         options?: ExportOptions
         projectId?: string
+        lipsyncSegments?: LipsyncSegment[]
       }
     ) => {
       try {
         const window = BrowserWindow.fromWebContents(event.sender)
         const exportId = data.projectId || `export-${Date.now()}`
 
+        if (data.lipsyncSegments && data.lipsyncSegments.length > 0) {
+          // Splice lip-synced video clips into export
+          console.log(
+            `[FFmpeg:Export] Splicing ${data.lipsyncSegments.length} lip-synced clips into export`
+          )
+          const result = await spliceVideo(
+            data.videoPath,
+            data.lipsyncSegments,
+            data.audioPath,
+            data.outputPath,
+            data.options,
+            (progress) => {
+              if (window) {
+                window.webContents.send(FFMPEG.EXPORT_PROGRESS, {
+                  stage: 'encoding',
+                  ...progress
+                })
+              }
+            }
+          )
+
+          return {
+            success: true,
+            data: result
+          }
+        }
+
+        // Fast path: just mux video + audio
         const result = await exportVideo(
           data.videoPath,
           data.audioPath,

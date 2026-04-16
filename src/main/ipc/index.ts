@@ -9,6 +9,7 @@ import { registerFFmpegHandlers } from './ffmpeg.ipc'
 import { registerFilesystemHandlers } from './filesystem.ipc'
 import { registerHistoryHandlers } from './history.ipc'
 import { registerProjectHandlers } from './project.ipc'
+import { registerQuickDubHandlers } from './quickdub.ipc'
 import { registerSegmentHandlers } from './segment.ipc'
 import { registerSettingsHandlers } from './settings.ipc'
 import { registerTranslationHandlers } from './translation.ipc'
@@ -28,6 +29,7 @@ export function registerAllHandlers(): void {
   registerTranslationHandlers()
   registerFFmpegHandlers()
   registerHistoryHandlers()
+  registerQuickDubHandlers()
 
   console.log('[IPC] All handlers registered')
 }

@@ -119,6 +119,15 @@ export const IPC_CHANNELS = {
     RECORD: 'history:record'
   },
 
+  // Quick Dub operations
+  QUICK_DUB: {
+    CLONE_VOICE: 'quick-dub:clone-voice',
+    TRANSCRIBE_RANGE: 'quick-dub:transcribe-range',
+    GENERATE: 'quick-dub:generate',
+    LIPSYNC: 'quick-dub:lipsync',
+    PROGRESS: 'quick-dub:progress'
+  },
+
   // App events (main -> renderer)
   APP: {
     READY: 'app:ready',

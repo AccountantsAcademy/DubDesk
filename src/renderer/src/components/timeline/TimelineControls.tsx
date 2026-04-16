@@ -15,7 +15,9 @@ export function TimelineControls(): React.JSX.Element {
     showWaveform,
     setShowWaveform,
     showOriginalAudio,
-    setShowOriginalAudio
+    setShowOriginalAudio,
+    rangeSelectionMode,
+    setRangeSelectionMode
   } = useTimelineStore()
 
   const { durationMs, currentTimeMs } = usePlaybackStore()
@@ -134,12 +136,36 @@ export function TimelineControls(): React.JSX.Element {
         {durationMs > 0 ? formatDuration(durationMs) : 'No media'}
       </div>
 
+      {/* Divider */}
+      <div className="h-4 w-px bg-chrome-border" />
+
+      {/* Quick Dub toggle */}
+      <button
+        onClick={() => setRangeSelectionMode(!rangeSelectionMode)}
+        className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded transition-colors ${
+          rangeSelectionMode
+            ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
+            : 'hover:bg-chrome-hover text-chrome-muted hover:text-chrome-text'
+        }`}
+        title="Quick Dub - select a range to transcribe and re-record (Q)"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+          />
+        </svg>
+        Quick Dub
+      </button>
+
       {/* Spacer */}
       <div className="flex-1" />
 
       {/* Keyboard shortcuts hint */}
       <div className="text-[10px] text-chrome-muted/60">
-        Space: Play/Pause • ←/→: Seek • Cmd+/-: Zoom
+        Space: Play/Pause • ←/→: Seek • Q: Quick Dub • Cmd+/-: Zoom
       </div>
     </div>
   )

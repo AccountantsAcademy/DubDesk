@@ -134,6 +134,7 @@ function getInlineSchema(): string {
         translated_text_hash TEXT,
         audio_generated_voice_id TEXT,
         audio_generated_duration_ms INTEGER,
+        lipsync_video_path TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at TEXT NOT NULL DEFAULT (datetime('now')),
         FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
@@ -221,6 +222,12 @@ function runMigrations(): void {
   if (!columnNames.has('audio_generated_duration_ms')) {
     console.log('[Database] Running migration: Adding audio_generated_duration_ms column')
     db.exec('ALTER TABLE segments ADD COLUMN audio_generated_duration_ms INTEGER')
+  }
+
+  // Migration: Add lip-sync video path column
+  if (!columnNames.has('lipsync_video_path')) {
+    console.log('[Database] Running migration: Adding lipsync_video_path column')
+    db.prepare('ALTER TABLE segments ADD COLUMN lipsync_video_path TEXT').run()
   }
 }
 

@@ -381,6 +381,66 @@ export interface HistoryGetStackResponse {
 }
 
 // ============================================
+// Quick Dub IPC Types
+// ============================================
+
+export interface QuickDubCloneVoiceRequest {
+  projectId: string
+  audioPath: string
+  voiceName: string
+}
+
+export interface QuickDubCloneVoiceResponse {
+  voiceId: string
+  name: string
+}
+
+export interface QuickDubTranscribeRangeRequest {
+  projectId: string
+  audioPath: string
+  startTimeMs: number
+  endTimeMs: number
+  language?: string
+}
+
+export interface QuickDubTranscribeRangeResponse {
+  text: string
+  segments: Array<{
+    text: string
+    startTimeMs: number
+    endTimeMs: number
+    speaker?: string
+  }>
+}
+
+export interface QuickDubGenerateRequest {
+  projectId: string
+  text: string
+  voiceId: string
+  startTimeMs: number
+  endTimeMs: number
+}
+
+export interface QuickDubGenerateResponse {
+  segmentId: string
+  audioPath: string
+  durationMs: number
+}
+
+export interface QuickDubLipsyncRequest {
+  projectId: string
+  segmentId: string
+  videoPath: string
+  audioPath: string
+  startTimeMs: number
+  endTimeMs: number
+}
+
+export interface QuickDubLipsyncResponse {
+  lipsyncVideoPath: string
+}
+
+// ============================================
 // Generic Response Types
 // ============================================
 

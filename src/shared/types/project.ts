@@ -30,6 +30,8 @@ export interface ProjectSettings {
   gridSizeMs: number
   /** Minimum gap duration (ms) before switching back to original audio. Gaps shorter than this will stay muted. Default: 5000 (5 seconds) */
   minGapForOriginalMs: number
+  /** ElevenLabs voice ID of the cloned voice for this project (used by Quick Dub) */
+  clonedVoiceId?: string
 }
 
 export interface ProjectCreateInput {

@@ -5,17 +5,40 @@ import { useCallback, useEffect, useState } from 'react'
 
 type TabId = 'apiKeys' | 'general'
 
+interface APIKeyEntry {
+  exists: boolean
+  masked: string | null
+  validating: boolean
+  valid?: boolean
+}
+
 interface APIKeyState {
-  elevenlabs: { exists: boolean; masked: string | null; validating: boolean; valid?: boolean }
-  anthropic: { exists: boolean; masked: string | null; validating: boolean; valid?: boolean }
+  elevenlabs: APIKeyEntry
+  anthropic: APIKeyEntry
+  syncso: APIKeyEntry
 }
 
 type ElevenLabsRegion = 'us' | 'eu'
 
 const API_KEY_TYPES = {
   ELEVENLABS: 'elevenlabs_api_key',
-  ANTHROPIC: 'anthropic_api_key'
+  ANTHROPIC: 'anthropic_api_key',
+  SYNC_SO: 'sync_so_api_key'
 } as const
+
+type ApiKeyId = 'elevenlabs' | 'anthropic' | 'syncso'
+
+function keyTypeLabel(keyType: ApiKeyId): string {
+  if (keyType === 'elevenlabs') return 'ElevenLabs'
+  if (keyType === 'anthropic') return 'Anthropic'
+  return 'Sync.so'
+}
+
+function keyTypeToApiType(keyType: ApiKeyId): string {
+  if (keyType === 'elevenlabs') return API_KEY_TYPES.ELEVENLABS
+  if (keyType === 'anthropic') return API_KEY_TYPES.ANTHROPIC
+  return API_KEY_TYPES.SYNC_SO
+}
 
 function GeneralSettings(): React.JSX.Element {
   const currentProject = useProjectStore((state) => state.currentProject)
@@ -67,24 +90,28 @@ export function SettingsModal(): React.JSX.Element | null {
   const [activeTab, setActiveTab] = useState<TabId>('apiKeys')
   const [apiKeyInputs, setApiKeyInputs] = useState({
     elevenlabs: '',
-    anthropic: ''
+    anthropic: '',
+    syncso: ''
   })
   const [apiKeyState, setApiKeyState] = useState<APIKeyState>({
     elevenlabs: { exists: false, masked: null, validating: false },
-    anthropic: { exists: false, masked: null, validating: false }
+    anthropic: { exists: false, masked: null, validating: false },
+    syncso: { exists: false, masked: null, validating: false }
   })
   const [showKeys, setShowKeys] = useState({
     elevenlabs: false,
-    anthropic: false
+    anthropic: false,
+    syncso: false
   })
   const [isLoading, setIsLoading] = useState(false)
   const [elevenLabsRegion, setElevenLabsRegion] = useState<ElevenLabsRegion>('us')
 
   const loadApiKeyStatus = useCallback(async () => {
     try {
-      const [elevenlabsResult, anthropicResult, regionResult] = await Promise.all([
+      const [elevenlabsResult, anthropicResult, syncsoResult, regionResult] = await Promise.all([
         window.dubdesk.settings.getApiKey(API_KEY_TYPES.ELEVENLABS),
         window.dubdesk.settings.getApiKey(API_KEY_TYPES.ANTHROPIC),
+        window.dubdesk.settings.getApiKey(API_KEY_TYPES.SYNC_SO),
         window.dubdesk.settings.getElevenLabsRegion()
       ])
 
@@ -97,6 +124,11 @@ export function SettingsModal(): React.JSX.Element | null {
         anthropic: {
           exists: anthropicResult.success && anthropicResult.exists,
           masked: anthropicResult.masked || null,
+          validating: false
+        },
+        syncso: {
+          exists: syncsoResult.success && syncsoResult.exists,
+          masked: syncsoResult.masked || null,
           validating: false
         }
       })
@@ -119,15 +151,14 @@ export function SettingsModal(): React.JSX.Element | null {
   const handleClose = useCallback(() => {
     closeModal('settings')
     // Reset state
-    setApiKeyInputs({ elevenlabs: '', anthropic: '' })
-    setShowKeys({ elevenlabs: false, anthropic: false })
+    setApiKeyInputs({ elevenlabs: '', anthropic: '', syncso: '' })
+    setShowKeys({ elevenlabs: false, anthropic: false, syncso: false })
     setActiveTab('apiKeys')
   }, [closeModal])
 
   const handleSaveApiKey = useCallback(
-    async (keyType: 'elevenlabs' | 'anthropic') => {
-      const apiKeyType =
-        keyType === 'elevenlabs' ? API_KEY_TYPES.ELEVENLABS : API_KEY_TYPES.ANTHROPIC
+    async (keyType: ApiKeyId) => {
+      const apiKeyType = keyTypeToApiType(keyType)
       const value = apiKeyInputs[keyType]
 
       if (!value.trim()) {
@@ -140,10 +171,7 @@ export function SettingsModal(): React.JSX.Element | null {
         const result = await window.dubdesk.settings.setApiKey(apiKeyType, value.trim())
 
         if (result.success) {
-          addToast(
-            'success',
-            `${keyType === 'elevenlabs' ? 'ElevenLabs' : 'Anthropic'} API key saved`
-          )
+          addToast('success', `${keyTypeLabel(keyType)} API key saved`)
           setApiKeyInputs((prev) => ({ ...prev, [keyType]: '' }))
           await loadApiKeyStatus()
         } else {
@@ -160,19 +188,15 @@ export function SettingsModal(): React.JSX.Element | null {
   )
 
   const handleDeleteApiKey = useCallback(
-    async (keyType: 'elevenlabs' | 'anthropic') => {
-      const apiKeyType =
-        keyType === 'elevenlabs' ? API_KEY_TYPES.ELEVENLABS : API_KEY_TYPES.ANTHROPIC
+    async (keyType: ApiKeyId) => {
+      const apiKeyType = keyTypeToApiType(keyType)
 
       setIsLoading(true)
       try {
         const result = await window.dubdesk.settings.deleteApiKey(apiKeyType)
 
         if (result.success) {
-          addToast(
-            'success',
-            `${keyType === 'elevenlabs' ? 'ElevenLabs' : 'Anthropic'} API key deleted`
-          )
+          addToast('success', `${keyTypeLabel(keyType)} API key deleted`)
           await loadApiKeyStatus()
         } else {
           addToast('error', result.error || 'Failed to delete API key')
@@ -206,9 +230,8 @@ export function SettingsModal(): React.JSX.Element | null {
   )
 
   const handleValidateApiKey = useCallback(
-    async (keyType: 'elevenlabs' | 'anthropic') => {
-      const apiKeyType =
-        keyType === 'elevenlabs' ? API_KEY_TYPES.ELEVENLABS : API_KEY_TYPES.ANTHROPIC
+    async (keyType: ApiKeyId) => {
+      const apiKeyType = keyTypeToApiType(keyType)
 
       setApiKeyState((prev) => ({
         ...prev,
@@ -225,10 +248,7 @@ export function SettingsModal(): React.JSX.Element | null {
           }))
 
           if (result.valid) {
-            addToast(
-              'success',
-              `${keyType === 'elevenlabs' ? 'ElevenLabs' : 'Anthropic'} API key is valid`
-            )
+            addToast('success', `${keyTypeLabel(keyType)} API key is valid`)
           } else {
             addToast('error', result.error || 'API key is invalid')
           }
@@ -514,6 +534,96 @@ export function SettingsModal(): React.JSX.Element | null {
                       type="button"
                       onClick={() => handleSaveApiKey('anthropic')}
                       disabled={isLoading || !apiKeyInputs.anthropic.trim()}
+                      className="px-4 py-2 bg-accent-primary hover:bg-accent-hover text-white rounded text-sm disabled:opacity-50"
+                    >
+                      Save
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Sync.so API Key */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Sync.so API Key</label>
+                  {apiKeyState.syncso.exists && (
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded ${
+                        apiKeyState.syncso.valid === true
+                          ? 'bg-green-500/20 text-green-400'
+                          : apiKeyState.syncso.valid === false
+                            ? 'bg-red-500/20 text-red-400'
+                            : 'bg-chrome-hover text-chrome-muted'
+                      }`}
+                    >
+                      {apiKeyState.syncso.validating
+                        ? 'Validating...'
+                        : apiKeyState.syncso.valid === true
+                          ? 'Valid'
+                          : apiKeyState.syncso.valid === false
+                            ? 'Invalid'
+                            : 'Configured'}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-chrome-muted">
+                  Used for lip-sync video generation in Quick Dub.{' '}
+                  <a
+                    href="https://sync.so"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent-primary hover:underline"
+                  >
+                    Get an API key
+                  </a>
+                </p>
+
+                {apiKeyState.syncso.exists ? (
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 px-3 py-2 bg-chrome-bg border border-chrome-border rounded text-sm text-chrome-muted font-mono">
+                      {showKeys.syncso ? apiKeyState.syncso.masked : '••••••••••••••••'}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowKeys((prev) => ({ ...prev, syncso: !prev.syncso }))
+                      }
+                      className="px-3 py-2 text-sm bg-chrome-hover rounded hover:bg-chrome-active"
+                    >
+                      {showKeys.syncso ? 'Hide' : 'Show'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleValidateApiKey('syncso')}
+                      disabled={apiKeyState.syncso.validating || isLoading}
+                      className="px-3 py-2 text-sm bg-chrome-hover rounded hover:bg-chrome-active disabled:opacity-50"
+                    >
+                      {apiKeyState.syncso.validating ? 'Testing...' : 'Test'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteApiKey('syncso')}
+                      disabled={isLoading}
+                      className="px-3 py-2 text-sm text-red-400 bg-red-500/10 rounded hover:bg-red-500/20 disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="password"
+                      value={apiKeyInputs.syncso}
+                      onChange={(e) =>
+                        setApiKeyInputs((prev) => ({ ...prev, syncso: e.target.value }))
+                      }
+                      placeholder="API key..."
+                      className="flex-1 px-3 py-2 bg-chrome-bg border border-chrome-border rounded focus:outline-none focus:border-accent-primary text-sm font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSaveApiKey('syncso')}
+                      disabled={isLoading || !apiKeyInputs.syncso.trim()}
                       className="px-4 py-2 bg-accent-primary hover:bg-accent-hover text-white rounded text-sm disabled:opacity-50"
                     >
                       Save

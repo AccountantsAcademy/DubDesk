@@ -205,6 +205,10 @@ export function registerSettingsHandlers(): void {
         const result = await validateAnthropicKey(apiKey)
         valid = result.valid
         error = result.error
+      } else if (data.keyType === API_KEYS.SYNC_SO) {
+        const result = await validateSyncSoKey(apiKey)
+        valid = result.valid
+        error = result.error
       } else if (data.keyType === API_KEYS.OPENAI) {
         // OpenAI validation not implemented yet
         valid = true
@@ -336,6 +340,34 @@ async function validateAnthropicKey(apiKey: string): Promise<{ valid: boolean; e
 
     // A successful response or rate limit means the key is valid
     if (response.ok || response.status === 429) {
+      return { valid: true }
+    }
+
+    if (response.status === 401) {
+      return { valid: false, error: 'Invalid API key' }
+    }
+
+    return { valid: false, error: `API error: ${response.status}` }
+  } catch (error) {
+    return {
+      valid: false,
+      error: error instanceof Error ? error.message : 'Network error'
+    }
+  }
+}
+
+/**
+ * Validate a Sync.so API key
+ */
+async function validateSyncSoKey(apiKey: string): Promise<{ valid: boolean; error?: string }> {
+  try {
+    const response = await fetch('https://api.sync.so/v2/generations', {
+      headers: {
+        'x-api-key': apiKey
+      }
+    })
+
+    if (response.ok) {
       return { valid: true }
     }
 

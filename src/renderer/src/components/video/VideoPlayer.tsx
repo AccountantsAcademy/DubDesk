@@ -3,6 +3,7 @@ import { useProjectStore } from '@renderer/stores/project.store'
 import { useUIStore } from '@renderer/stores/ui.store'
 import type React from 'react'
 import { useCallback, useEffect, useRef } from 'react'
+import { LipsyncOverlay } from './LipsyncOverlay'
 import { PlaybackControls } from './PlaybackControls'
 
 export function VideoPlayer(): React.JSX.Element {
@@ -187,26 +188,31 @@ export function VideoPlayer(): React.JSX.Element {
       {/* Video Display */}
       <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden min-h-0">
         {videoSrc ? (
-          <video
-            ref={videoRef}
-            src={videoSrc}
-            className="max-w-full max-h-full object-contain"
-            onClick={handleClick}
-            onDoubleClick={handleDoubleClick}
-            onTimeUpdate={handleTimeUpdate}
-            onLoadedMetadata={handleLoadedMetadata}
-            onEnded={handleEnded}
-            onError={(e) => {
-              const video = e.currentTarget
-              console.error('[VideoPlayer] Video error:', {
-                error: video.error,
-                errorCode: video.error?.code,
-                errorMessage: video.error?.message,
-                src: video.src
-              })
-            }}
-            playsInline
-          />
+          <>
+            <video
+              ref={videoRef}
+              src={videoSrc}
+              className="max-w-full max-h-full object-contain"
+              onClick={handleClick}
+              onDoubleClick={handleDoubleClick}
+              onTimeUpdate={handleTimeUpdate}
+              onLoadedMetadata={handleLoadedMetadata}
+              onEnded={handleEnded}
+              onError={(e) => {
+                const video = e.currentTarget
+                console.error('[VideoPlayer] Video error:', {
+                  error: video.error,
+                  errorCode: video.error?.code,
+                  errorMessage: video.error?.message,
+                  src: video.src
+                })
+              }}
+              playsInline
+            />
+
+            {/* Lip-synced video overlay — shows on top of original during lip-synced segments */}
+            <LipsyncOverlay />
+          </>
         ) : (
           <div className="text-chrome-muted text-center">
             <div className="text-4xl mb-2">🎬</div>

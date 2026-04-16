@@ -12,6 +12,7 @@ type ModalId =
   | 'about'
   | 'speakerManager'
   | 'exportSettings'
+  | 'quickDub'
 
 interface PanelState {
   isOpen: boolean
@@ -104,7 +105,8 @@ const defaultModals: Record<ModalId, ModalState> = {
   apiKeys: { isOpen: false },
   about: { isOpen: false },
   speakerManager: { isOpen: false },
-  exportSettings: { isOpen: false }
+  exportSettings: { isOpen: false },
+  quickDub: { isOpen: false }
 }
 
 const initialState: UIState = {

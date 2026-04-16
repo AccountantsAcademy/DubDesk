@@ -5,7 +5,10 @@
 
 import { useHistoryStore } from '@renderer/stores/history.store'
 import { usePlaybackStore } from '@renderer/stores/playback.store'
+import { useQuickDubStore } from '@renderer/stores/quickdub.store'
 import { useSegmentStore } from '@renderer/stores/segment.store'
+import { useTimelineStore } from '@renderer/stores/timeline.store'
+import { useUIStore } from '@renderer/stores/ui.store'
 import { useEffect } from 'react'
 
 interface UseKeyboardShortcutsOptions {
@@ -92,6 +95,37 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
         e.preventDefault()
         selectAll()
         return
+      }
+
+      // Q - Toggle Quick Dub mode
+      if (e.code === 'KeyQ' && !isMeta) {
+        e.preventDefault()
+        const { rangeSelectionMode, setRangeSelectionMode } = useTimelineStore.getState()
+        setRangeSelectionMode(!rangeSelectionMode)
+        return
+      }
+
+      // Escape - Exit Quick Dub mode / close Quick Dub modal
+      if (e.code === 'Escape') {
+        const { rangeSelectionMode, setRangeSelectionMode, clearRange } =
+          useTimelineStore.getState()
+        const { modals, closeModal } = useUIStore.getState()
+
+        if (modals.quickDub.isOpen) {
+          e.preventDefault()
+          useQuickDubStore.getState().cancel()
+          clearRange()
+          setRangeSelectionMode(false)
+          closeModal('quickDub')
+          return
+        }
+
+        if (rangeSelectionMode) {
+          e.preventDefault()
+          clearRange()
+          setRangeSelectionMode(false)
+          return
+        }
       }
     }
 

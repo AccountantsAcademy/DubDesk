@@ -20,9 +20,12 @@ export {
   selectStaleSegments,
   useSegmentStore
 } from './segment.store'
+export { useQuickDubStore } from './quickdub.store'
 export {
+  selectHasRange,
   selectIsDragging,
   selectIsResizing,
+  selectRange,
   selectVisibleTimeRange,
   useTimelineStore,
   type WaveformData

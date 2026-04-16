@@ -5,6 +5,7 @@ import { DubbedAudioPlayer, SegmentAudioPlayer } from './components/audio'
 import {
   ExportSettingsModal,
   NewProjectModal,
+  QuickDubModal,
   SettingsModal,
   SpeakerManagerModal
 } from './components/modals'
@@ -57,6 +58,7 @@ function App(): React.JSX.Element {
       <SettingsModal />
       <SpeakerManagerModal />
       <ExportSettingsModal />
+      <QuickDubModal />
       {/* Toast Notifications */}
       <ToastContainer />
     </div>
@@ -340,6 +342,22 @@ function EditorView(): React.JSX.Element {
       refreshHistoryState().catch(console.error)
       if (currentProject.sourceVideoDurationMs) {
         setDuration(currentProject.sourceVideoDurationMs)
+      }
+
+      // Set volume defaults based on whether source and target languages differ
+      const isSameLanguage =
+        currentProject.sourceLanguage &&
+        currentProject.targetLanguage &&
+        currentProject.sourceLanguage === currentProject.targetLanguage
+      const { setOriginalAudioVolume, setDubbedAudioVolume } = usePlaybackStore.getState()
+      if (isSameLanguage) {
+        // Same language (Quick Dub use case): both tracks at full volume
+        setOriginalAudioVolume(1.0)
+        setDubbedAudioVolume(1.0)
+      } else {
+        // Different languages (dubbing): original quiet, dubbed loud
+        setOriginalAudioVolume(0.3)
+        setDubbedAudioVolume(1.0)
       }
     }
   }, [currentProject, loadSegments, loadSpeakers, setDuration, refreshHistoryState])

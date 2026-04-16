@@ -463,13 +463,29 @@ export function WorkflowToolbar(): React.JSX.Element | null {
           }
         } else {
           // Export video
-          setWorkflowState({ stage: 'exporting', progress: 60, message: 'Encoding video... 0%' })
+          // Check if any segments have lip-synced video clips
+          const lipsyncSegs = segmentsWithAudio
+            .filter((s) => s.lipsyncVideoPath)
+            .map((s) => ({
+              lipsyncVideoPath: s.lipsyncVideoPath!,
+              startTimeMs: s.startTimeMs,
+              endTimeMs: s.endTimeMs
+            }))
+
+          setWorkflowState({
+            stage: 'exporting',
+            progress: 60,
+            message: lipsyncSegs.length > 0
+              ? `Splicing ${lipsyncSegs.length} lip-synced clip${lipsyncSegs.length > 1 ? 's' : ''}...`
+              : 'Encoding video... 0%'
+          })
 
           const result = await window.dubdesk.ffmpeg.export({
             videoPath: currentProject.sourceVideoPath,
             audioPath: mixedAudioPath,
             outputPath: saveResult.filePath,
-            projectId: currentProject.id
+            projectId: currentProject.id,
+            lipsyncSegments: lipsyncSegs.length > 0 ? lipsyncSegs : undefined
           })
 
           if (result.success) {
