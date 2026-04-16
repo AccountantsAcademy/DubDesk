@@ -79,7 +79,7 @@ export async function transcribeAudio(
   formData.append('file', blob, path.basename(audioPath))
 
   // model_id is required by ElevenLabs API
-  formData.append('model_id', 'scribe_v1')
+  formData.append('model_id', 'scribe_v2')
 
   // Add options
   if (options.languageCode) {

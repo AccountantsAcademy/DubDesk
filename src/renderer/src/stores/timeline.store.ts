@@ -25,6 +25,9 @@ interface TimelineState {
   waveformData: WaveformData | null
   waveformLoading: boolean
   waveformError: string | null
+  rangeSelectionMode: boolean
+  rangeStartMs: number | null
+  rangeEndMs: number | null
 }
 
 interface TimelineActions {
@@ -50,6 +53,9 @@ interface TimelineActions {
   scrollToTime: (timeMs: number) => void
   loadWaveform: (mediaPath: string, projectId: string) => Promise<void>
   clearWaveform: () => void
+  setRangeSelectionMode: (enabled: boolean) => void
+  setRange: (startMs: number, endMs: number) => void
+  clearRange: () => void
   reset: () => void
 }
 
@@ -71,7 +77,10 @@ const initialState: TimelineState = {
   cursorPositionMs: 0,
   waveformData: null,
   waveformLoading: false,
-  waveformError: null
+  waveformError: null,
+  rangeSelectionMode: false,
+  rangeStartMs: null,
+  rangeEndMs: null
 }
 
 export const useTimelineStore = create<TimelineStore>()(
@@ -249,6 +258,25 @@ export const useTimelineStore = create<TimelineStore>()(
         set({ waveformData: null, waveformLoading: false, waveformError: null })
       },
 
+      setRangeSelectionMode: (enabled) => {
+        if (!enabled) {
+          set({ rangeSelectionMode: false, rangeStartMs: null, rangeEndMs: null })
+        } else {
+          set({ rangeSelectionMode: true })
+        }
+      },
+
+      setRange: (startMs, endMs) => {
+        // Ensure start < end
+        const min = Math.min(startMs, endMs)
+        const max = Math.max(startMs, endMs)
+        set({ rangeStartMs: Math.max(0, min), rangeEndMs: max })
+      },
+
+      clearRange: () => {
+        set({ rangeStartMs: null, rangeEndMs: null })
+      },
+
       reset: () => set(initialState)
     })),
     { name: 'timeline-store' }
@@ -266,3 +294,11 @@ export const selectVisibleTimeRange = (state: TimelineStore) => {
 export const selectIsDragging = (state: TimelineStore) => state.draggedSegmentId !== null
 
 export const selectIsResizing = (state: TimelineStore) => state.resizingSegmentId !== null
+
+export const selectHasRange = (state: TimelineStore) =>
+  state.rangeStartMs !== null && state.rangeEndMs !== null
+
+export const selectRange = (state: TimelineStore) => ({
+  startMs: state.rangeStartMs,
+  endMs: state.rangeEndMs
+})

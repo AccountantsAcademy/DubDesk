@@ -15,7 +15,8 @@ export const API_KEYS = {
   ELEVENLABS: 'elevenlabs_api_key',
   ELEVENLABS_REGION: 'elevenlabs_region',
   ANTHROPIC: 'anthropic_api_key',
-  OPENAI: 'openai_api_key'
+  OPENAI: 'openai_api_key',
+  SYNC_SO: 'sync_so_api_key'
 } as const
 
 export type ElevenLabsRegion = 'us' | 'eu'
@@ -94,17 +95,20 @@ export async function getAPIKeyStatus(): Promise<{
   [API_KEYS.ELEVENLABS]: boolean
   [API_KEYS.ANTHROPIC]: boolean
   [API_KEYS.OPENAI]: boolean
+  [API_KEYS.SYNC_SO]: boolean
 }> {
-  const [elevenlabs, anthropic, openai] = await Promise.all([
+  const [elevenlabs, anthropic, openai, syncSo] = await Promise.all([
     hasAPIKey(API_KEYS.ELEVENLABS),
     hasAPIKey(API_KEYS.ANTHROPIC),
-    hasAPIKey(API_KEYS.OPENAI)
+    hasAPIKey(API_KEYS.OPENAI),
+    hasAPIKey(API_KEYS.SYNC_SO)
   ])
 
   return {
     [API_KEYS.ELEVENLABS]: elevenlabs,
     [API_KEYS.ANTHROPIC]: anthropic,
-    [API_KEYS.OPENAI]: openai
+    [API_KEYS.OPENAI]: openai,
+    [API_KEYS.SYNC_SO]: syncSo
   }
 }
 

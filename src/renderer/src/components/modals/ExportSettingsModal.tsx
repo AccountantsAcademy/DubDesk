@@ -58,11 +58,23 @@ export function ExportSettingsModal(): React.JSX.Element | null {
   // Load volume settings from project and set default format based on mode
   useEffect(() => {
     if (isOpen) {
+      // Same language = both at 100%, different languages = 30/100 default
+      const sameLanguage =
+        currentProject?.sourceLanguage &&
+        currentProject?.targetLanguage &&
+        currentProject.sourceLanguage === currentProject.targetLanguage
+      const defaultOriginal = sameLanguage ? 1.0 : 0.3
+      const defaultDubbed = 1.0
+
       setSettings((prev) => ({
         ...prev,
         format: isAudioOnly ? 'm4a' : 'mp4',
-        originalVolume: currentProject?.settings?.originalAudioVolume ?? 0.3,
-        dubbedVolume: currentProject?.settings?.dubbedAudioVolume ?? 1.0
+        originalVolume: sameLanguage
+          ? defaultOriginal
+          : (currentProject?.settings?.originalAudioVolume ?? defaultOriginal),
+        dubbedVolume: sameLanguage
+          ? defaultDubbed
+          : (currentProject?.settings?.dubbedAudioVolume ?? defaultDubbed)
       }))
     }
   }, [isOpen, currentProject, isAudioOnly])

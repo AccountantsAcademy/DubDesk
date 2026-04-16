@@ -1,3 +1,4 @@
+import { useOverlayStore } from '@renderer/stores/overlay.store'
 import { usePlaybackStore } from '@renderer/stores/playback.store'
 import { useSegmentStore } from '@renderer/stores/segment.store'
 import { useTimelineStore } from '@renderer/stores/timeline.store'
@@ -5,6 +6,7 @@ import { useUIStore } from '@renderer/stores/ui.store'
 import type React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Playhead } from './Playhead'
+import { RangeSelection } from './RangeSelection'
 import { TimelineControls } from './TimelineControls'
 import { TimelineHeader } from './TimelineHeader'
 import { TimelineTrack } from './TimelineTrack'
@@ -13,16 +15,22 @@ export function Timeline(): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [isScrubbing, setIsScrubbing] = useState(false)
+  const [isRangeSelecting, setIsRangeSelecting] = useState(false)
+  const rangeAnchorRef = useRef<number | null>(null)
 
   const timelineHeight = useUIStore((state) => state.timelineHeight)
   const { setScrollPosition, setViewportWidth, scrollPosition, msToPixels, pixelsToMs } =
     useTimelineStore()
+  const rangeSelectionMode = useTimelineStore((state) => state.rangeSelectionMode)
+  const setRange = useTimelineStore((state) => state.setRange)
+  const openModal = useUIStore((state) => state.openModal)
   // Only subscribe to non-time values to avoid re-renders during playback
   const durationMs = usePlaybackStore((state) => state.durationMs)
   const seek = usePlaybackStore((state) => state.seek)
   const pause = usePlaybackStore((state) => state.pause)
   const segments = useSegmentStore((state) => state.segments)
   const clearSelection = useSegmentStore((state) => state.clearSelection)
+  const overlays = useOverlayStore((state) => state.overlays)
 
   // Track viewport width for zoom calculations
   useEffect(() => {
@@ -80,26 +88,36 @@ export function Timeline(): React.JSX.Element {
     [pixelsToMs, durationMs]
   )
 
-  // Handle mouse down to start scrubbing
+  // Handle mouse down to start scrubbing or range selection
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       // Only handle left click
       if (e.button !== 0) return
 
-      // Don't scrub if clicking on segments
+      // Don't scrub if clicking on segments or overlays
       if ((e.target as HTMLElement).closest('.segment-item')) return
+      if ((e.target as HTMLElement).closest('.overlay-item')) return
 
       // Clear selection when clicking background
       clearSelection()
+      useOverlayStore.getState().selectOverlay(null)
 
       const timeMs = getTimeFromMouseEvent(e)
       if (timeMs === null) return
 
-      setIsScrubbing(true)
-      pause() // Pause playback while scrubbing
-      seek(timeMs)
+      if (rangeSelectionMode) {
+        // Range selection mode: start range drag
+        setIsRangeSelecting(true)
+        rangeAnchorRef.current = timeMs
+        setRange(timeMs, timeMs)
+      } else {
+        // Normal mode: scrub
+        setIsScrubbing(true)
+        pause()
+        seek(timeMs)
+      }
     },
-    [getTimeFromMouseEvent, seek, pause, clearSelection]
+    [getTimeFromMouseEvent, seek, pause, clearSelection, rangeSelectionMode, setRange]
   )
 
   // Handle mouse move while scrubbing
@@ -125,6 +143,37 @@ export function Timeline(): React.JSX.Element {
       document.removeEventListener('mouseup', handleMouseUp)
     }
   }, [isScrubbing, getTimeFromMouseEvent, seek])
+
+  // Handle mouse move/up while range selecting
+  useEffect(() => {
+    if (!isRangeSelecting) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const timeMs = getTimeFromMouseEvent(e)
+      if (timeMs !== null && rangeAnchorRef.current !== null) {
+        setRange(rangeAnchorRef.current, timeMs)
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsRangeSelecting(false)
+      rangeAnchorRef.current = null
+
+      // If a valid range was selected (> 200ms), open the Quick Dub modal
+      const { rangeStartMs, rangeEndMs } = useTimelineStore.getState()
+      if (rangeStartMs !== null && rangeEndMs !== null && rangeEndMs - rangeStartMs > 200) {
+        openModal('quickDub', { rangeStartMs, rangeEndMs })
+      }
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isRangeSelecting, getTimeFromMouseEvent, setRange, openModal])
 
   // Reset scroll to start when duration changes (new video loaded)
   useEffect(() => {
@@ -226,7 +275,7 @@ export function Timeline(): React.JSX.Element {
       {/* Scrollable Timeline Area */}
       <div
         ref={scrollContainerRef}
-        className={`timeline-scroll-container flex-1 overflow-x-auto overflow-y-hidden relative ${isScrubbing ? 'cursor-grabbing select-none' : 'cursor-pointer'}`}
+        className={`timeline-scroll-container flex-1 overflow-x-auto overflow-y-hidden relative ${isScrubbing ? 'cursor-grabbing select-none' : isRangeSelecting ? 'cursor-crosshair select-none' : rangeSelectionMode ? 'cursor-crosshair' : 'cursor-pointer'}`}
         onScroll={handleScroll}
         onMouseDown={handleMouseDown}
       >
@@ -244,6 +293,14 @@ export function Timeline(): React.JSX.Element {
 
             {/* Segments Track */}
             <TimelineTrack label="Dubbed" type="dubbed" height={80} segments={segments} />
+
+            {/* Overlays Track */}
+            <TimelineTrack label="Overlays" type="overlays" height={40} overlays={overlays} />
+
+            {/* Range Selection Overlay */}
+            <div className="absolute left-20 right-0 top-0 bottom-0 pointer-events-none">
+              <RangeSelection />
+            </div>
 
             {/* Playhead */}
             <Playhead />

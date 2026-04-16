@@ -27,6 +27,7 @@ export interface Segment {
   translatedTextHash?: string // Hash of translatedText when audio was generated
   audioGeneratedVoiceId?: string // Voice ID used when audio was generated
   audioGeneratedDurationMs?: number // Segment duration when audio was generated
+  lipsyncVideoPath?: string // Path to lip-synced video clip (from Sync.so)
   createdAt: string
   updatedAt: string
 }
@@ -63,6 +64,7 @@ export interface SegmentUpdateInput {
   translatedTextHash?: string | null
   audioGeneratedVoiceId?: string | null
   audioGeneratedDurationMs?: number | null
+  lipsyncVideoPath?: string | null
 }
 
 export interface SegmentBatchUpdate {

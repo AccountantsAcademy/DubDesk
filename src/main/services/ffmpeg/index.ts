@@ -12,6 +12,7 @@ export * from './export'
 export * from './extract'
 export * from './mix'
 export * from './stretch'
+export * from './volume'
 export * from './waveform'
 
 export interface MediaInfo {

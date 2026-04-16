@@ -220,6 +220,49 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS.SET_ELEVENLABS_REGION, { region })
   },
 
+  // Image Overlay operations
+  overlay: {
+    getAll: (projectId: string) => ipcRenderer.invoke(IPC_CHANNELS.OVERLAY.GET_ALL, { projectId }),
+    create: (data: {
+      projectId: string
+      sourceImagePath: string
+      startTimeMs: number
+      endTimeMs: number
+    }) => ipcRenderer.invoke(IPC_CHANNELS.OVERLAY.CREATE, data),
+    update: (id: string, updates: unknown) =>
+      ipcRenderer.invoke(IPC_CHANNELS.OVERLAY.UPDATE, { id, updates }),
+    delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.OVERLAY.DELETE, { id }),
+    importImage: () => ipcRenderer.invoke(IPC_CHANNELS.OVERLAY.IMPORT_IMAGE)
+  },
+
+  // Quick Dub operations
+  quickDub: {
+    cloneVoice: (data: { projectId: string; audioPath: string; voiceName: string }) =>
+      ipcRenderer.invoke(IPC_CHANNELS.QUICK_DUB.CLONE_VOICE, data),
+    transcribeRange: (data: {
+      projectId: string
+      audioPath: string
+      startTimeMs: number
+      endTimeMs: number
+      language?: string
+    }) => ipcRenderer.invoke(IPC_CHANNELS.QUICK_DUB.TRANSCRIBE_RANGE, data),
+    generate: (data: {
+      projectId: string
+      text: string
+      voiceId: string
+      startTimeMs: number
+      endTimeMs: number
+    }) => ipcRenderer.invoke(IPC_CHANNELS.QUICK_DUB.GENERATE, data),
+    lipsync: (data: {
+      projectId: string
+      segmentId: string
+      videoPath: string
+      audioPath: string
+      startTimeMs: number
+      endTimeMs: number
+    }) => ipcRenderer.invoke(IPC_CHANNELS.QUICK_DUB.LIPSYNC, data)
+  },
+
   // History operations
   history: {
     undo: (projectId: string) => ipcRenderer.invoke(IPC_CHANNELS.HISTORY.UNDO, { projectId }),

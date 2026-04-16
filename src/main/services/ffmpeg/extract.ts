@@ -1,6 +1,6 @@
 /**
- * FFmpeg Audio Extraction
- * Extract audio tracks from video files
+ * FFmpeg Audio & Video Extraction
+ * Extract audio tracks and video clips from video files
  */
 
 import { mkdir, stat } from 'node:fs/promises'
@@ -144,5 +144,61 @@ export async function extractAudioSegment(
     ...options,
     startTime,
     duration
+  })
+}
+
+export interface VideoClipResult {
+  outputPath: string
+  durationMs: number
+}
+
+/**
+ * Extract a video clip (with audio) for a time range
+ * Uses stream copy for fast extraction without re-encoding
+ */
+export async function extractVideoClip(
+  videoPath: string,
+  outputPath: string,
+  startTimeMs: number,
+  endTimeMs: number
+): Promise<VideoClipResult> {
+  // Verify input exists
+  try {
+    await stat(videoPath)
+  } catch {
+    throw new Error(`Video file not found: ${videoPath}`)
+  }
+
+  // Ensure output directory exists
+  const outputDir = path.dirname(outputPath)
+  await mkdir(outputDir, { recursive: true })
+
+  const startTime = startTimeMs / 1000
+  const duration = (endTimeMs - startTimeMs) / 1000
+
+  return new Promise((resolve, reject) => {
+    try {
+      ffmpeg(videoPath)
+        .setStartTime(startTime)
+        .setDuration(duration)
+        .outputOptions(['-c', 'copy']) // Copy both video and audio without re-encoding
+        .on('start', (cmdline) => {
+          console.log('[FFmpeg:VideoClip] Starting:', cmdline)
+        })
+        .on('end', () => {
+          console.log('[FFmpeg:VideoClip] Complete:', outputPath)
+          resolve({
+            outputPath,
+            durationMs: Math.round(duration * 1000)
+          })
+        })
+        .on('error', (err) => {
+          console.error('[FFmpeg:VideoClip] Error:', err)
+          reject(new Error(`Video clip extraction failed: ${err.message}`))
+        })
+        .save(outputPath)
+    } catch (err) {
+      reject(err instanceof Error ? err : new Error(String(err)))
+    }
   })
 }

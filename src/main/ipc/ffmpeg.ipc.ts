@@ -5,6 +5,7 @@
 
 import { IPC_CHANNELS } from '@shared/constants/channels'
 import { BrowserWindow, ipcMain } from 'electron'
+import { overlayRepository, projectRepository } from '../services/database/repositories'
 import {
   type AudioExportOptions,
   type AudioSegment,
@@ -13,13 +14,16 @@ import {
   type ExtractOptions,
   exportAudioOnly,
   exportVideo,
+  exportVideoWithOverlays,
   extractAudio,
   extractWaveform,
+  type LipsyncSegment,
   loadWaveformCache,
   type MixOptions,
   mixAudio,
   probeMedia,
-  saveWaveformCache
+  saveWaveformCache,
+  spliceVideo
 } from '../services/ffmpeg'
 
 export function registerFFmpegHandlers(): void {
@@ -125,7 +129,7 @@ export function registerFFmpegHandlers(): void {
     }
   )
 
-  // Export final video
+  // Export final video (with optional lip-sync video splicing and image overlays)
   ipcMain.handle(
     FFMPEG.EXPORT,
     async (
@@ -136,12 +140,121 @@ export function registerFFmpegHandlers(): void {
         outputPath: string
         options?: ExportOptions
         projectId?: string
+        lipsyncSegments?: LipsyncSegment[]
       }
     ) => {
       try {
         const window = BrowserWindow.fromWebContents(event.sender)
         const exportId = data.projectId || `export-${Date.now()}`
 
+        // Load image overlays for this project
+        const imageOverlays = data.projectId ? overlayRepository.findByProject(data.projectId) : []
+        const hasOverlays = imageOverlays.length > 0
+        const hasLipsync = data.lipsyncSegments && data.lipsyncSegments.length > 0
+
+        // Get video dimensions for overlay positioning
+        let videoWidth = 1920
+        let videoHeight = 1080
+        if (hasOverlays && data.projectId) {
+          const project = projectRepository.findById(data.projectId)
+          if (project) {
+            videoWidth = project.sourceVideoWidth || 1920
+            videoHeight = project.sourceVideoHeight || 1080
+          }
+        }
+
+        if (hasOverlays) {
+          console.log(`[FFmpeg:Export] Found ${imageOverlays.length} image overlay(s)`)
+        }
+
+        let videoInputPath = data.videoPath
+
+        if (hasLipsync) {
+          // Splice lip-synced video clips
+          console.log(
+            `[FFmpeg:Export] Splicing ${data.lipsyncSegments!.length} lip-synced clips into export`
+          )
+
+          if (hasOverlays) {
+            // Both lipsync AND overlays: splice to intermediate, then overlay
+            const path = await import('node:path')
+            const { mkdir } = await import('node:fs/promises')
+            const intermediateDir = path.dirname(data.outputPath)
+            await mkdir(intermediateDir, { recursive: true })
+            const intermediatePath = path.join(intermediateDir, `_intermediate_${Date.now()}.mp4`)
+
+            await spliceVideo(
+              data.videoPath,
+              data.lipsyncSegments!,
+              data.audioPath,
+              intermediatePath,
+              data.options,
+              (progress) => {
+                if (window) {
+                  window.webContents.send(FFMPEG.EXPORT_PROGRESS, {
+                    stage: 'encoding',
+                    percent: progress.percent * 0.6 // 0-60%
+                  })
+                }
+              }
+            )
+
+            videoInputPath = intermediatePath
+          } else {
+            // Only lipsync, no overlays
+            const result = await spliceVideo(
+              data.videoPath,
+              data.lipsyncSegments!,
+              data.audioPath,
+              data.outputPath,
+              data.options,
+              (progress) => {
+                if (window) {
+                  window.webContents.send(FFMPEG.EXPORT_PROGRESS, {
+                    stage: 'encoding',
+                    ...progress
+                  })
+                }
+              }
+            )
+            return { success: true, data: result }
+          }
+        }
+
+        if (hasOverlays) {
+          // Apply image overlays (re-encodes video)
+          try {
+            const result = await exportVideoWithOverlays(
+              videoInputPath,
+              data.audioPath,
+              data.outputPath,
+              imageOverlays,
+              videoWidth,
+              videoHeight,
+              data.options,
+              (progress) => {
+                if (window) {
+                  const basePercent = hasLipsync ? 60 : 0
+                  const range = hasLipsync ? 40 : 100
+                  window.webContents.send(FFMPEG.EXPORT_PROGRESS, {
+                    stage: 'encoding',
+                    percent: basePercent + progress.percent * (range / 100)
+                  })
+                }
+              }
+            )
+
+            return { success: true, data: result }
+          } finally {
+            // Clean up intermediate file if we created one
+            if (videoInputPath !== data.videoPath) {
+              const { unlink } = await import('node:fs/promises')
+              unlink(videoInputPath).catch(() => {})
+            }
+          }
+        }
+
+        // Fast path: just mux video + audio (no overlays, no lipsync)
         const result = await exportVideo(
           data.videoPath,
           data.audioPath,
@@ -158,10 +271,7 @@ export function registerFFmpegHandlers(): void {
           exportId
         )
 
-        return {
-          success: true,
-          data: result
-        }
+        return { success: true, data: result }
       } catch (error) {
         console.error('[FFmpeg:Export] Error:', error)
         return {

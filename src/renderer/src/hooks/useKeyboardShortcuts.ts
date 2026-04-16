@@ -4,8 +4,13 @@
  */
 
 import { useHistoryStore } from '@renderer/stores/history.store'
+import { useOverlayStore } from '@renderer/stores/overlay.store'
 import { usePlaybackStore } from '@renderer/stores/playback.store'
+import { useProjectStore } from '@renderer/stores/project.store'
+import { useQuickDubStore } from '@renderer/stores/quickdub.store'
 import { useSegmentStore } from '@renderer/stores/segment.store'
+import { useTimelineStore } from '@renderer/stores/timeline.store'
+import { useUIStore } from '@renderer/stores/ui.store'
 import { useEffect } from 'react'
 
 interface UseKeyboardShortcutsOptions {
@@ -34,9 +39,11 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
     if (!enabled) return
 
     const handleKeyDown = (e: KeyboardEvent): void => {
-      // Skip if typing in an input or textarea
+      // Allow Escape even when focused on input/textarea
       const target = e.target as HTMLElement
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      const isTextInput =
+        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+      if (isTextInput && e.code !== 'Escape') {
         return
       }
 
@@ -47,6 +54,20 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
       if (e.code === 'Space' && !isMeta) {
         e.preventDefault()
         toggle()
+        return
+      }
+
+      // Left/Right arrow - Seek by one frame (1/25s = 40ms)
+      if (e.code === 'ArrowLeft' && !isMeta) {
+        e.preventDefault()
+        const { currentTimeMs } = usePlaybackStore.getState()
+        usePlaybackStore.getState().seek(currentTimeMs - 40)
+        return
+      }
+      if (e.code === 'ArrowRight' && !isMeta) {
+        e.preventDefault()
+        const { currentTimeMs } = usePlaybackStore.getState()
+        usePlaybackStore.getState().seek(currentTimeMs + 40)
         return
       }
 
@@ -78,8 +99,14 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
         return
       }
 
-      // Delete or Backspace - Delete selected segments
+      // Delete or Backspace - Delete selected segments or overlay
       if ((e.code === 'Delete' || e.code === 'Backspace') && !isMeta) {
+        const { selectedOverlayId, deleteOverlay } = useOverlayStore.getState()
+        if (selectedOverlayId) {
+          e.preventDefault()
+          deleteOverlay(selectedOverlayId)
+          return
+        }
         if (selectedSegmentIds.size > 0) {
           e.preventDefault()
           deleteSelectedSegments()
@@ -92,6 +119,58 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
         e.preventDefault()
         selectAll()
         return
+      }
+
+      // Q - Toggle Quick Edit mode (only when source/target language are the same)
+      if (e.code === 'KeyQ' && !isMeta) {
+        const project = useProjectStore.getState().currentProject
+        const sameLanguage =
+          project?.sourceLanguage &&
+          project?.targetLanguage &&
+          project.sourceLanguage === project.targetLanguage
+        if (sameLanguage) {
+          e.preventDefault()
+          const { rangeSelectionMode, setRangeSelectionMode } = useTimelineStore.getState()
+          setRangeSelectionMode(!rangeSelectionMode)
+        }
+        return
+      }
+
+      // Escape - Deselect overlay / exit Quick Dub mode / close modal
+      if (e.code === 'Escape') {
+        const { rangeSelectionMode, setRangeSelectionMode, clearRange } =
+          useTimelineStore.getState()
+        const { modals, closeModal } = useUIStore.getState()
+
+        if (modals.quickDub.isOpen) {
+          e.preventDefault()
+          useQuickDubStore.getState().cancel()
+          clearRange()
+          setRangeSelectionMode(false)
+          closeModal('quickDub')
+          return
+        }
+
+        if (rangeSelectionMode) {
+          e.preventDefault()
+          clearRange()
+          setRangeSelectionMode(false)
+          return
+        }
+
+        // Deselect overlay or segments
+        const { selectedOverlayId, selectOverlay } = useOverlayStore.getState()
+        if (selectedOverlayId) {
+          e.preventDefault()
+          selectOverlay(null)
+          return
+        }
+
+        if (selectedSegmentIds.size > 0) {
+          e.preventDefault()
+          useSegmentStore.getState().clearSelection()
+          return
+        }
       }
     }
 

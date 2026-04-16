@@ -1,3 +1,4 @@
+import { useOverlayStore } from '@renderer/stores/overlay.store'
 import { usePlaybackStore } from '@renderer/stores/playback.store'
 import { isSegmentStale, useSegmentStore } from '@renderer/stores/segment.store'
 import { useTimelineStore } from '@renderer/stores/timeline.store'
@@ -96,6 +97,8 @@ export function SegmentItem({ segment, trackHeight }: SegmentItemProps): React.J
       setDragOffset(e.clientX - rect.left)
       setIsDragging(true)
       startDrag(segment.id)
+
+      useOverlayStore.getState().selectOverlay(null)
 
       const isMultiSelect = e.shiftKey || e.metaKey
       if (!isSelected) {

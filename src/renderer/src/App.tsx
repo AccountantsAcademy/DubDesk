@@ -1,10 +1,12 @@
 import { SUPPORTED_LANGUAGES } from '@shared/constants/defaults'
+import type { ImageOverlay } from '@shared/types/overlay'
 import type { Segment, Speaker } from '@shared/types/segment'
 import { useEffect, useMemo, useState } from 'react'
 import { DubbedAudioPlayer, SegmentAudioPlayer } from './components/audio'
 import {
   ExportSettingsModal,
   NewProjectModal,
+  QuickDubModal,
   SettingsModal,
   SpeakerManagerModal
 } from './components/modals'
@@ -18,6 +20,7 @@ import {
   isSegmentStale,
   selectStaleSegmentCount,
   useHistoryStore,
+  useOverlayStore,
   usePlaybackStore,
   useProjectStore,
   useSegmentStore,
@@ -57,6 +60,7 @@ function App(): React.JSX.Element {
       <SettingsModal />
       <SpeakerManagerModal />
       <ExportSettingsModal />
+      <QuickDubModal />
       {/* Toast Notifications */}
       <ToastContainer />
     </div>
@@ -320,9 +324,12 @@ function EditorView(): React.JSX.Element {
   const currentProject = useProjectStore((state) => state.currentProject)
   const loadSegments = useSegmentStore((state) => state.loadSegments)
   const loadSpeakers = useSegmentStore((state) => state.loadSpeakers)
+  const loadOverlays = useOverlayStore((state) => state.loadOverlays)
   const setDuration = usePlaybackStore((state) => state.setDuration)
   const selectedSegmentIds = useSegmentStore((state) => state.selectedSegmentIds)
   const segments = useSegmentStore((state) => state.segments)
+  const overlays = useOverlayStore((state) => state.overlays)
+  const selectedOverlayId = useOverlayStore((state) => state.selectedOverlayId)
   const openModal = useUIStore((state) => state.openModal)
 
   // History store for undo/redo
@@ -337,12 +344,29 @@ function EditorView(): React.JSX.Element {
     if (currentProject) {
       loadSegments(currentProject.id).catch(console.error)
       loadSpeakers(currentProject.id).catch(console.error)
+      loadOverlays(currentProject.id).catch(console.error)
       refreshHistoryState().catch(console.error)
       if (currentProject.sourceVideoDurationMs) {
         setDuration(currentProject.sourceVideoDurationMs)
       }
+
+      // Set volume defaults based on whether source and target languages differ
+      const isSameLanguage =
+        currentProject.sourceLanguage &&
+        currentProject.targetLanguage &&
+        currentProject.sourceLanguage === currentProject.targetLanguage
+      const { setOriginalAudioVolume, setDubbedAudioVolume } = usePlaybackStore.getState()
+      if (isSameLanguage) {
+        // Same language (Quick Dub use case): both tracks at full volume
+        setOriginalAudioVolume(1.0)
+        setDubbedAudioVolume(1.0)
+      } else {
+        // Different languages (dubbing): original quiet, dubbed loud
+        setOriginalAudioVolume(0.3)
+        setDubbedAudioVolume(1.0)
+      }
     }
-  }, [currentProject, loadSegments, loadSpeakers, setDuration, refreshHistoryState])
+  }, [currentProject, loadSegments, loadSpeakers, loadOverlays, setDuration, refreshHistoryState])
 
   // Get selected segment(s) for properties panel
   const selectedSegment =
@@ -353,6 +377,11 @@ function EditorView(): React.JSX.Element {
           .filter((s) => selectedSegmentIds.has(s.id))
           .sort((a, b) => a.startTimeMs - b.startTimeMs)
       : []
+
+  // Get selected overlay for properties panel
+  const selectedOverlay = selectedOverlayId
+    ? overlays.find((o) => o.id === selectedOverlayId)
+    : null
 
   // Enable keyboard shortcuts
   useKeyboardShortcuts({ enabled: true })
@@ -464,7 +493,9 @@ function EditorView(): React.JSX.Element {
         <aside className="w-72 bg-chrome-surface border-l border-chrome-border overflow-y-auto">
           <div className="p-3">
             <h3 className="text-sm font-medium mb-2">Properties</h3>
-            {selectedSegment ? (
+            {selectedOverlay ? (
+              <OverlayProperties overlay={selectedOverlay} />
+            ) : selectedSegment ? (
               <SegmentProperties segment={selectedSegment} />
             ) : selectedSegments.length > 1 ? (
               <MultiSegmentProperties segments={selectedSegments} allSegments={segments} />
@@ -1025,6 +1056,183 @@ function ProjectOverview(): React.JSX.Element {
         Tip: Use <kbd className="px-1 py-0.5 bg-chrome-bg rounded text-[9px]">⌘A</kbd> to select all
         segments
       </p>
+    </div>
+  )
+}
+
+// Image overlay properties panel
+function OverlayProperties({ overlay }: { overlay: ImageOverlay }): React.JSX.Element {
+  const updateOverlay = useOverlayStore((state) => state.updateOverlay)
+  const deleteOverlay = useOverlayStore((state) => state.deleteOverlay)
+  const addToast = useUIStore((state) => state.addToast)
+
+  const imgSrc = overlay.imagePath.startsWith('file://')
+    ? overlay.imagePath
+    : `file://${overlay.imagePath}`
+
+  const handleDelete = async () => {
+    try {
+      await deleteOverlay(overlay.id)
+      addToast('success', 'Overlay deleted')
+    } catch {
+      addToast('error', 'Failed to delete overlay')
+    }
+  }
+
+  return (
+    <div className="space-y-2.5">
+      {/* Image preview */}
+      <div>
+        <label className="block text-xs text-chrome-muted mb-1">Image Overlay</label>
+        <div className="bg-chrome-bg border border-chrome-border rounded overflow-hidden">
+          <img
+            src={imgSrc}
+            alt={overlay.originalFilename}
+            className="w-full h-auto max-h-32 object-contain"
+          />
+        </div>
+        <p className="text-[10px] text-chrome-muted mt-1 truncate">{overlay.originalFilename}</p>
+      </div>
+
+      {/* Timing */}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="block text-xs text-chrome-muted mb-1">Start (ms)</label>
+          <input
+            type="number"
+            value={overlay.startTimeMs}
+            onChange={(e) =>
+              updateOverlay(overlay.id, { startTimeMs: parseInt(e.target.value, 10) || 0 })
+            }
+            className="w-full px-1.5 py-1 bg-chrome-bg border border-chrome-border rounded text-xs"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-chrome-muted mb-1">End (ms)</label>
+          <input
+            type="number"
+            value={overlay.endTimeMs}
+            onChange={(e) =>
+              updateOverlay(overlay.id, { endTimeMs: parseInt(e.target.value, 10) || 0 })
+            }
+            className="w-full px-1.5 py-1 bg-chrome-bg border border-chrome-border rounded text-xs"
+          />
+        </div>
+      </div>
+      <div className="text-[10px] text-chrome-muted">
+        Duration: {((overlay.endTimeMs - overlay.startTimeMs) / 1000).toFixed(2)}s
+      </div>
+
+      {/* Position */}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="block text-xs text-chrome-muted mb-1">X Position (%)</label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={1}
+            value={Math.round(overlay.positionX * 100)}
+            onChange={(e) =>
+              updateOverlay(overlay.id, {
+                positionX: Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)) / 100
+              })
+            }
+            className="w-full px-1.5 py-1 bg-chrome-bg border border-chrome-border rounded text-xs"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-chrome-muted mb-1">Y Position (%)</label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={1}
+            value={Math.round(overlay.positionY * 100)}
+            onChange={(e) =>
+              updateOverlay(overlay.id, {
+                positionY: Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)) / 100
+              })
+            }
+            className="w-full px-1.5 py-1 bg-chrome-bg border border-chrome-border rounded text-xs"
+          />
+        </div>
+      </div>
+
+      {/* Size */}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="block text-xs text-chrome-muted mb-1">Width (%)</label>
+          <input
+            type="number"
+            min={3}
+            max={100}
+            step={1}
+            value={Math.round(overlay.widthFraction * 100)}
+            onChange={(e) =>
+              updateOverlay(overlay.id, {
+                widthFraction: Math.max(3, Math.min(100, parseInt(e.target.value, 10) || 3)) / 100
+              })
+            }
+            className="w-full px-1.5 py-1 bg-chrome-bg border border-chrome-border rounded text-xs"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-chrome-muted mb-1">Height (%)</label>
+          <input
+            type="number"
+            min={3}
+            max={100}
+            step={1}
+            value={Math.round(overlay.heightFraction * 100)}
+            onChange={(e) =>
+              updateOverlay(overlay.id, {
+                heightFraction: Math.max(3, Math.min(100, parseInt(e.target.value, 10) || 3)) / 100
+              })
+            }
+            className="w-full px-1.5 py-1 bg-chrome-bg border border-chrome-border rounded text-xs"
+          />
+        </div>
+      </div>
+
+      {/* Opacity */}
+      <div>
+        <div className="flex items-center justify-between">
+          <label className="text-xs text-chrome-muted">Opacity</label>
+          <span className="text-[10px] text-chrome-muted">
+            {Math.round(overlay.opacity * 100)}%
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={overlay.opacity}
+          onChange={(e) => updateOverlay(overlay.id, { opacity: parseFloat(e.target.value) })}
+          className="w-full h-1.5 bg-chrome-bg rounded-full appearance-none cursor-pointer accent-purple-500"
+        />
+      </div>
+
+      {/* Z-Index */}
+      <div>
+        <label className="block text-xs text-chrome-muted mb-1">Layer Order</label>
+        <input
+          type="number"
+          value={overlay.zIndex}
+          onChange={(e) => updateOverlay(overlay.id, { zIndex: parseInt(e.target.value, 10) || 0 })}
+          className="w-full px-1.5 py-1 bg-chrome-bg border border-chrome-border rounded text-xs"
+        />
+      </div>
+
+      {/* Delete */}
+      <button
+        type="button"
+        onClick={handleDelete}
+        className="w-full px-3 py-2 text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded transition-colors"
+      >
+        Delete Overlay
+      </button>
     </div>
   )
 }

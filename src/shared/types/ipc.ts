@@ -3,6 +3,7 @@
  * Request and response types for all IPC communication
  */
 
+import type { ImageOverlay, ImageOverlayCreateInput, ImageOverlayUpdateInput } from './overlay'
 import type { Project, ProjectCreateInput, RecentProject } from './project'
 import type {
   Segment,
@@ -378,6 +379,97 @@ export interface HistoryRedoResponse {
 export interface HistoryGetStackResponse {
   undoStack: HistoryEntry[]
   redoStack: HistoryEntry[]
+}
+
+// ============================================
+// Quick Dub IPC Types
+// ============================================
+
+export interface QuickDubCloneVoiceRequest {
+  projectId: string
+  audioPath: string
+  voiceName: string
+}
+
+export interface QuickDubCloneVoiceResponse {
+  voiceId: string
+  name: string
+}
+
+export interface QuickDubTranscribeRangeRequest {
+  projectId: string
+  audioPath: string
+  startTimeMs: number
+  endTimeMs: number
+  language?: string
+}
+
+export interface QuickDubTranscribeRangeResponse {
+  text: string
+  segments: Array<{
+    text: string
+    startTimeMs: number
+    endTimeMs: number
+    speaker?: string
+  }>
+}
+
+export interface QuickDubGenerateRequest {
+  projectId: string
+  text: string
+  voiceId: string
+  startTimeMs: number
+  endTimeMs: number
+}
+
+export interface QuickDubGenerateResponse {
+  segmentId: string
+  audioPath: string
+  durationMs: number
+}
+
+export interface QuickDubLipsyncRequest {
+  projectId: string
+  segmentId: string
+  videoPath: string
+  audioPath: string
+  startTimeMs: number
+  endTimeMs: number
+}
+
+export interface QuickDubLipsyncResponse {
+  lipsyncVideoPath: string
+}
+
+// ============================================
+// Image Overlay IPC Types
+// ============================================
+
+export interface OverlayGetAllRequest {
+  projectId: string
+}
+
+export interface OverlayGetAllResponse {
+  overlays: ImageOverlay[]
+}
+
+export interface OverlayCreateRequest extends ImageOverlayCreateInput {}
+
+export interface OverlayCreateResponse {
+  overlay: ImageOverlay
+}
+
+export interface OverlayUpdateRequest {
+  id: string
+  updates: ImageOverlayUpdateInput
+}
+
+export interface OverlayUpdateResponse {
+  overlay: ImageOverlay
+}
+
+export interface OverlayDeleteRequest {
+  id: string
 }
 
 // ============================================

@@ -3,6 +3,7 @@
  */
 
 export { type HistoryActionType, type HistoryEntry, historyRepository } from './history.repo'
+export { overlayRepository } from './overlay.repo'
 export { projectRepository } from './project.repo'
 export { segmentRepository } from './segment.repo'
 export { settingsRepository } from './settings.repo'

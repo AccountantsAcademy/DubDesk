@@ -6,12 +6,14 @@
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { app } from 'electron'
-import { projectRepository, segmentRepository } from '../database/repositories'
+import { overlayRepository, projectRepository, segmentRepository } from '../database/repositories'
 import {
   type AudioExportOptions,
   type ExportOptions,
   exportAudioOnly,
-  exportVideo
+  exportVideo,
+  exportVideoWithOverlays,
+  spliceVideo
 } from '../ffmpeg/export'
 import { type AudioSegment, type MixOptions, mixAudio } from '../ffmpeg/mix'
 import { setWorkflowState, type WorkflowProgress } from './index'
@@ -157,6 +159,11 @@ export async function runExportWorkflow(
       }
     )
 
+    // Load image overlays for this project
+    const imageOverlays = overlayRepository.findByProject(projectId)
+    const hasOverlays = imageOverlays.length > 0
+    console.log(`[Export] Found ${imageOverlays.length} image overlay(s)`)
+
     // Step 4: Export based on mode
     if (mode === 'audio-only') {
       // Audio-only export
@@ -201,27 +208,146 @@ export async function runExportWorkflow(
     }
 
     // Video export (default)
-    onProgress?.({
-      stage: 'exporting',
-      progress: 50,
-      message: 'Encoding video...'
-    })
-
-    const result = await exportVideo(
-      project.sourceVideoPath!,
-      mixedAudioPath,
-      outputPath,
-      exportOptions || { videoCodec: 'copy', audioCodec: 'aac' },
-      (progress) => {
-        const percent = 50 + progress.percent * 0.5 // 50-100%
-        onProgress?.({
-          stage: 'exporting',
-          progress: percent,
-          message: `Encoding video... ${Math.round(progress.percent)}%`
-        })
-      },
-      projectId
+    // Check if any segments have lip-synced video clips
+    console.log(
+      `[Export] Checking ${segmentsWithAudio.length} segments for lipsync video:`,
+      segmentsWithAudio.map((s) => ({
+        id: s.id,
+        lipsyncVideoPath: s.lipsyncVideoPath || '(none)'
+      }))
     )
+    const lipsyncSegments = segmentsWithAudio
+      .filter((s) => s.lipsyncVideoPath)
+      .map((s) => ({
+        lipsyncVideoPath: s.lipsyncVideoPath!,
+        startTimeMs: s.startTimeMs,
+        endTimeMs: s.endTimeMs
+      }))
+    console.log(`[Export] Found ${lipsyncSegments.length} lip-synced segments`)
+
+    let result: { outputPath: string; durationMs: number; fileSize: number }
+
+    if (lipsyncSegments.length > 0 && hasOverlays) {
+      // Both lipsync AND overlays: splice first to intermediate, then overlay
+      onProgress?.({
+        stage: 'exporting',
+        progress: 50,
+        message: `Splicing ${lipsyncSegments.length} lip-synced clip(s)...`
+      })
+
+      const intermediateVideoPath = path.join(exportDir, 'spliced_intermediate.mp4')
+
+      await spliceVideo(
+        project.sourceVideoPath!,
+        lipsyncSegments,
+        mixedAudioPath,
+        intermediateVideoPath,
+        exportOptions || { format: 'mp4' },
+        (progress) => {
+          const percent = 50 + progress.percent * 0.3 // 50-80%
+          onProgress?.({
+            stage: 'exporting',
+            progress: percent,
+            message: `Splicing video... ${Math.round(progress.percent)}%`
+          })
+        }
+      )
+
+      onProgress?.({
+        stage: 'exporting',
+        progress: 80,
+        message: `Compositing ${imageOverlays.length} image overlay(s)...`
+      })
+
+      result = await exportVideoWithOverlays(
+        intermediateVideoPath,
+        mixedAudioPath,
+        outputPath,
+        imageOverlays,
+        project.sourceVideoWidth || 1920,
+        project.sourceVideoHeight || 1080,
+        exportOptions || { format: 'mp4' },
+        (progress) => {
+          const percent = 80 + progress.percent * 0.2 // 80-100%
+          onProgress?.({
+            stage: 'exporting',
+            progress: percent,
+            message: `Compositing overlays... ${Math.round(progress.percent)}%`
+          })
+        }
+      )
+    } else if (hasOverlays) {
+      // Only overlays (no lipsync): overlay filter on original video
+      onProgress?.({
+        stage: 'exporting',
+        progress: 50,
+        message: `Compositing ${imageOverlays.length} image overlay(s)...`
+      })
+
+      result = await exportVideoWithOverlays(
+        project.sourceVideoPath!,
+        mixedAudioPath,
+        outputPath,
+        imageOverlays,
+        project.sourceVideoWidth || 1920,
+        project.sourceVideoHeight || 1080,
+        exportOptions || { format: 'mp4' },
+        (progress) => {
+          const percent = 50 + progress.percent * 0.5 // 50-100%
+          onProgress?.({
+            stage: 'exporting',
+            progress: percent,
+            message: `Compositing overlays... ${Math.round(progress.percent)}%`
+          })
+        }
+      )
+    } else if (lipsyncSegments.length > 0) {
+      // Only lipsync (no overlays): splice video clips
+      onProgress?.({
+        stage: 'exporting',
+        progress: 50,
+        message: `Splicing ${lipsyncSegments.length} lip-synced clip${lipsyncSegments.length > 1 ? 's' : ''}...`
+      })
+
+      result = await spliceVideo(
+        project.sourceVideoPath!,
+        lipsyncSegments,
+        mixedAudioPath,
+        outputPath,
+        exportOptions || { format: 'mp4' },
+        (progress) => {
+          const percent = 50 + progress.percent * 0.5 // 50-100%
+          onProgress?.({
+            stage: 'exporting',
+            progress: percent,
+            message: `Splicing video... ${Math.round(progress.percent)}%`
+          })
+        }
+      )
+    } else {
+      // Fast path: just mux original video + mixed audio (no re-encoding)
+      onProgress?.({
+        stage: 'exporting',
+        progress: 50,
+        message: 'Encoding video...'
+      })
+
+      result = await exportVideo(
+        project.sourceVideoPath!,
+        mixedAudioPath,
+        outputPath,
+        exportOptions || { videoCodec: 'copy', audioCodec: 'aac' },
+        (progress) => {
+          const percent = 50 + progress.percent * 0.5 // 50-100%
+          onProgress?.({
+            stage: 'exporting',
+            progress: percent,
+            message: `Encoding video... ${Math.round(progress.percent)}%`
+          })
+        },
+        projectId
+      )
+    }
 
     onProgress?.({
       stage: 'exporting',

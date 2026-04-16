@@ -134,6 +134,7 @@ function getInlineSchema(): string {
         translated_text_hash TEXT,
         audio_generated_voice_id TEXT,
         audio_generated_duration_ms INTEGER,
+        lipsync_video_path TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at TEXT NOT NULL DEFAULT (datetime('now')),
         FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
@@ -178,7 +179,27 @@ function getInlineSchema(): string {
         FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     );
 
+    -- Image Overlays Table
+    CREATE TABLE IF NOT EXISTS image_overlays (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        image_path TEXT NOT NULL,
+        original_filename TEXT NOT NULL,
+        start_time_ms INTEGER NOT NULL,
+        end_time_ms INTEGER NOT NULL,
+        position_x REAL NOT NULL DEFAULT 0.1,
+        position_y REAL NOT NULL DEFAULT 0.1,
+        width_fraction REAL NOT NULL DEFAULT 0.5,
+        height_fraction REAL NOT NULL DEFAULT 0.5,
+        z_index INTEGER NOT NULL DEFAULT 0,
+        opacity REAL NOT NULL DEFAULT 1.0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+
     -- Indexes
+    CREATE INDEX IF NOT EXISTS idx_overlays_project ON image_overlays(project_id);
     CREATE INDEX IF NOT EXISTS idx_segments_project ON segments(project_id);
     CREATE INDEX IF NOT EXISTS idx_segments_time ON segments(project_id, start_time_ms);
     CREATE INDEX IF NOT EXISTS idx_segments_status ON segments(project_id, status);
@@ -221,6 +242,40 @@ function runMigrations(): void {
   if (!columnNames.has('audio_generated_duration_ms')) {
     console.log('[Database] Running migration: Adding audio_generated_duration_ms column')
     db.exec('ALTER TABLE segments ADD COLUMN audio_generated_duration_ms INTEGER')
+  }
+
+  // Migration: Add lip-sync video path column
+  if (!columnNames.has('lipsync_video_path')) {
+    console.log('[Database] Running migration: Adding lipsync_video_path column')
+    db.prepare('ALTER TABLE segments ADD COLUMN lipsync_video_path TEXT').run()
+  }
+
+  // Migration: Create image_overlays table if missing (for existing databases)
+  const tables = db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='image_overlays'")
+    .all() as Array<{ name: string }>
+  if (tables.length === 0) {
+    console.log('[Database] Running migration: Creating image_overlays table')
+    db.prepare(`
+      CREATE TABLE image_overlays (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          image_path TEXT NOT NULL,
+          original_filename TEXT NOT NULL,
+          start_time_ms INTEGER NOT NULL,
+          end_time_ms INTEGER NOT NULL,
+          position_x REAL NOT NULL DEFAULT 0.1,
+          position_y REAL NOT NULL DEFAULT 0.1,
+          width_fraction REAL NOT NULL DEFAULT 0.5,
+          height_fraction REAL NOT NULL DEFAULT 0.5,
+          z_index INTEGER NOT NULL DEFAULT 0,
+          opacity REAL NOT NULL DEFAULT 1.0,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      )
+    `).run()
+    db.prepare('CREATE INDEX idx_overlays_project ON image_overlays(project_id)').run()
   }
 }
 

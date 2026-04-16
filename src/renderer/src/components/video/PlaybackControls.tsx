@@ -65,6 +65,7 @@ export function PlaybackControls(): React.JSX.Element {
           type="range"
           min={0}
           max={durationMs || 100}
+          step={40}
           value={currentTimeMs}
           onChange={handleSeek}
           className="w-full h-1 bg-chrome-border rounded-lg appearance-none cursor-pointer accent-accent-primary"
