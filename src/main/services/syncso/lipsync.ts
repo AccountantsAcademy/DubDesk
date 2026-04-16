@@ -160,9 +160,7 @@ export async function waitForLipsync(
     }
 
     if (status.status === 'FAILED' || status.status === 'REJECTED') {
-      throw new Error(
-        `Lip-sync ${status.status.toLowerCase()}: ${status.error || 'Unknown error'}`
-      )
+      throw new Error(`Lip-sync ${status.status.toLowerCase()}: ${status.error || 'Unknown error'}`)
     }
 
     // Check timeout

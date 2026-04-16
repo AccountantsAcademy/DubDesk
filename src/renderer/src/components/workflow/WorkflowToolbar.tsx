@@ -481,9 +481,10 @@ export function WorkflowToolbar(): React.JSX.Element | null {
           setWorkflowState({
             stage: 'exporting',
             progress: 60,
-            message: lipsyncSegs.length > 0
-              ? `Splicing ${lipsyncSegs.length} lip-synced clip${lipsyncSegs.length > 1 ? 's' : ''}...`
-              : 'Encoding video... 0%'
+            message:
+              lipsyncSegs.length > 0
+                ? `Splicing ${lipsyncSegs.length} lip-synced clip${lipsyncSegs.length > 1 ? 's' : ''}...`
+                : 'Encoding video... 0%'
           })
 
           const result = await window.dubdesk.ffmpeg.export({

@@ -3,6 +3,7 @@
  * Request and response types for all IPC communication
  */
 
+import type { ImageOverlay, ImageOverlayCreateInput, ImageOverlayUpdateInput } from './overlay'
 import type { Project, ProjectCreateInput, RecentProject } from './project'
 import type {
   Segment,
@@ -438,6 +439,37 @@ export interface QuickDubLipsyncRequest {
 
 export interface QuickDubLipsyncResponse {
   lipsyncVideoPath: string
+}
+
+// ============================================
+// Image Overlay IPC Types
+// ============================================
+
+export interface OverlayGetAllRequest {
+  projectId: string
+}
+
+export interface OverlayGetAllResponse {
+  overlays: ImageOverlay[]
+}
+
+export interface OverlayCreateRequest extends ImageOverlayCreateInput {}
+
+export interface OverlayCreateResponse {
+  overlay: ImageOverlay
+}
+
+export interface OverlayUpdateRequest {
+  id: string
+  updates: ImageOverlayUpdateInput
+}
+
+export interface OverlayUpdateResponse {
+  overlay: ImageOverlay
+}
+
+export interface OverlayDeleteRequest {
+  id: string
 }
 
 // ============================================

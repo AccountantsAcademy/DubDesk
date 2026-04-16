@@ -465,6 +465,214 @@ export function getAudioExportFormats(): Array<{
 }
 
 // ============================================
+// Image Overlay Compositing
+// ============================================
+
+import type { ImageOverlay } from '@shared/types/overlay'
+
+export interface OverlayExportSegment {
+  imagePath: string
+  startTimeSec: number
+  endTimeSec: number
+  x: number
+  y: number
+  width: number
+  height: number
+  opacity: number
+}
+
+/**
+ * Build FFmpeg filter graph to composite image overlays onto video.
+ * Each overlay image is scaled to the correct size and overlaid at the correct position
+ * with a time-based enable expression.
+ */
+function buildOverlayFilterGraph(overlays: OverlayExportSegment[]): {
+  filterComplex: string
+  outputLabel: string
+} {
+  if (overlays.length === 0) {
+    return { filterComplex: '', outputLabel: '[0:v]' }
+  }
+
+  const filters: string[] = []
+
+  // Normalize video to display dimensions (square pixels).
+  // The browser's <video>.videoWidth/Height returns display dimensions (SAR-corrected),
+  // but FFmpeg decodes to coded dimensions which may differ. This ensures they match.
+  filters.push('[0:v]scale=iw*sar:ih,setsar=1[base]')
+  let lastLabel = 'base'
+
+  for (let i = 0; i < overlays.length; i++) {
+    const o = overlays[i]
+    const imgIdx = i + 1 // input 0 is video, images start at 1
+    const imgLabel = `img${i}`
+    const outLabel = i === overlays.length - 1 ? 'outv' : `tmp${i}`
+
+    // Scale the image to the target size and ensure rgba format for transparency
+    filters.push(
+      `[${imgIdx}:v]scale=${o.width}:${o.height},format=rgba${o.opacity < 1 ? `,colorchannelmixer=aa=${o.opacity.toFixed(2)}` : ''}[${imgLabel}]`
+    )
+
+    // Overlay with time-based enable
+    const startSec = o.startTimeSec.toFixed(3)
+    const endSec = o.endTimeSec.toFixed(3)
+    filters.push(
+      `[${lastLabel}][${imgLabel}]overlay=${o.x}:${o.y}:enable='between(t,${startSec},${endSec})'[${outLabel}]`
+    )
+
+    lastLabel = outLabel
+  }
+
+  return {
+    filterComplex: filters.join(';'),
+    outputLabel: `[${lastLabel}]`
+  }
+}
+
+/**
+ * Convert ImageOverlay fractional coordinates to absolute pixel coordinates for FFmpeg.
+ */
+function overlaysToExportSegments(
+  overlays: ImageOverlay[],
+  videoWidth: number,
+  videoHeight: number
+): OverlayExportSegment[] {
+  return overlays
+    .sort((a, b) => a.zIndex - b.zIndex) // lower z-index first
+    .map((o) => ({
+      imagePath: o.imagePath,
+      startTimeSec: o.startTimeMs / 1000,
+      endTimeSec: o.endTimeMs / 1000,
+      x: Math.round(o.positionX * videoWidth),
+      y: Math.round(o.positionY * videoHeight),
+      width: Math.max(2, Math.round(o.widthFraction * videoWidth)),
+      height: Math.max(2, Math.round(o.heightFraction * videoHeight)),
+      opacity: o.opacity
+    }))
+}
+
+/**
+ * Export video with image overlays composited using FFmpeg filter graphs.
+ * This always re-encodes the video stream since overlay filters cannot be used with stream copy.
+ */
+export async function exportVideoWithOverlays(
+  videoPath: string,
+  audioPath: string,
+  outputPath: string,
+  overlays: ImageOverlay[],
+  _videoWidth: number,
+  _videoHeight: number,
+  options: ExportOptions = {},
+  onProgress?: (progress: { percent: number }) => void
+): Promise<ExportResult> {
+  // Verify inputs
+  for (const filePath of [videoPath, audioPath]) {
+    try {
+      await stat(filePath)
+    } catch {
+      throw new Error(`File not found: ${filePath}`)
+    }
+  }
+
+  const outputDir = path.dirname(outputPath)
+  await mkdir(outputDir, { recursive: true })
+
+  // Probe video and compute DISPLAY dimensions (what the browser's <video> element shows).
+  // Coded dimensions may differ from display dimensions when SAR ≠ 1:1.
+  // The filter graph normalizes the video to display dims with scale=iw*sar:ih,setsar=1,
+  // so overlay coordinates must be relative to display dimensions.
+  const displayDims = await probeDisplayDimensions(videoPath)
+  console.log(
+    `[FFmpeg:OverlayExport] Display dimensions: ${displayDims.width}x${displayDims.height}`
+  )
+
+  for (const o of overlays) {
+    console.log(
+      `[FFmpeg:OverlayExport] Overlay "${o.originalFilename}": pos=(${o.positionX.toFixed(3)}, ${o.positionY.toFixed(3)}) size=(${o.widthFraction.toFixed(3)}, ${o.heightFraction.toFixed(3)})`
+    )
+  }
+
+  const exportSegments = overlaysToExportSegments(overlays, displayDims.width, displayDims.height)
+
+  for (const s of exportSegments) {
+    console.log(
+      `[FFmpeg:OverlayExport] Export segment: pos=(${s.x}, ${s.y}) size=(${s.width}x${s.height})`
+    )
+  }
+
+  const { filterComplex, outputLabel } = buildOverlayFilterGraph(exportSegments)
+  console.log(`[FFmpeg:OverlayExport] Filter: ${filterComplex}`)
+
+  const format = options.format || 'mp4'
+  const preset = options.preset || 'medium'
+  const crf = options.crf ?? 23
+  const audioBitrate = options.audioBitrate || '192k'
+
+  // Build FFmpeg arguments
+  const args: string[] = ['-i', videoPath]
+
+  // Add each overlay image as an input
+  for (const seg of exportSegments) {
+    args.push('-i', seg.imagePath)
+  }
+
+  // Add mixed audio as input
+  args.push('-i', audioPath)
+
+  // Apply filter complex
+  args.push('-filter_complex', filterComplex)
+
+  // Map filtered video and audio
+  args.push('-map', outputLabel)
+  const audioInputIdx = 1 + exportSegments.length // audio is last input
+  args.push('-map', `${audioInputIdx}:a`)
+
+  // Video encoding (must re-encode with overlay filters)
+  args.push('-c:v', 'libx264', '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p')
+
+  // Audio encoding
+  args.push('-c:a', 'aac', '-b:a', audioBitrate)
+
+  if (format === 'mp4') {
+    args.push('-movflags', '+faststart')
+  }
+
+  args.push('-f', format, '-y', outputPath)
+
+  console.log(`[FFmpeg:OverlayExport] Compositing ${overlays.length} image overlay(s)...`)
+
+  await runFfmpegCmd(args)
+  onProgress?.({ percent: 100 })
+
+  // Get result info
+  let fileSize = 0
+  let durationMs = 0
+  try {
+    const stats = await stat(outputPath)
+    fileSize = stats.size
+  } catch {
+    // Ignore
+  }
+
+  try {
+    durationMs = await new Promise<number>((resolve, reject) => {
+      ffmpeg.ffprobe(outputPath, (err, metadata) => {
+        if (err) return reject(err)
+        resolve((metadata.format.duration || 0) * 1000)
+      })
+    })
+  } catch {
+    // Ignore
+  }
+
+  console.log(
+    `[FFmpeg:OverlayExport] Complete: ${outputPath} (${(fileSize / 1024 / 1024).toFixed(1)}MB)`
+  )
+
+  return { outputPath, durationMs: Math.round(durationMs), fileSize }
+}
+
+// ============================================
 // Video Splicing (Lip-sync clips into export)
 // ============================================
 
@@ -493,6 +701,49 @@ interface VideoProperties {
   width: number
   height: number
   fps: number
+}
+
+/**
+ * Probe video DISPLAY dimensions (accounting for non-square pixels / SAR).
+ * This matches what the browser's <video>.videoWidth/Height returns.
+ */
+function probeDisplayDimensions(videoPath: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(videoPath, (err, metadata) => {
+      if (err) {
+        reject(new Error(`Failed to probe video: ${err.message}`))
+        return
+      }
+      const vs = metadata.streams.find((s) => s.codec_type === 'video')
+      if (!vs) {
+        reject(new Error('No video stream found'))
+        return
+      }
+
+      const codedW = vs.width || 1920
+      const codedH = vs.height || 1080
+
+      // Parse SAR (sample aspect ratio) to compute display dimensions
+      let sarNum = 1
+      let sarDen = 1
+      if (vs.sample_aspect_ratio && vs.sample_aspect_ratio !== '0:1') {
+        const parts = vs.sample_aspect_ratio.split(':')
+        if (parts.length === 2) {
+          sarNum = Number.parseInt(parts[0], 10) || 1
+          sarDen = Number.parseInt(parts[1], 10) || 1
+        }
+      }
+
+      const displayW = Math.round(codedW * (sarNum / sarDen))
+      const displayH = codedH
+
+      console.log(
+        `[FFmpeg:Probe] coded=${codedW}x${codedH} SAR=${sarNum}:${sarDen} display=${displayW}x${displayH}`
+      )
+
+      resolve({ width: displayW, height: displayH })
+    })
+  })
 }
 
 /**
@@ -591,27 +842,43 @@ async function extractVideoPiece(
     const startSec = (piece.startMs / 1000).toFixed(3)
     const durationSec = ((piece.endMs - piece.startMs) / 1000).toFixed(3)
     await runFfmpegCmd([
-      '-ss', startSec,
-      '-t', durationSec,
-      '-i', originalVideoPath,
+      '-ss',
+      startSec,
+      '-t',
+      durationSec,
+      '-i',
+      originalVideoPath,
       '-an',
-      '-vf', scaleFilter,
-      '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-crf', '18',
-      '-pix_fmt', 'yuv420p',
-      '-y', outPath
+      '-vf',
+      scaleFilter,
+      '-c:v',
+      'libx264',
+      '-preset',
+      'fast',
+      '-crf',
+      '18',
+      '-pix_fmt',
+      'yuv420p',
+      '-y',
+      outPath
     ])
   } else {
     await runFfmpegCmd([
-      '-i', piece.videoPath,
+      '-i',
+      piece.videoPath,
       '-an',
-      '-vf', scaleFilter,
-      '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-crf', '18',
-      '-pix_fmt', 'yuv420p',
-      '-y', outPath
+      '-vf',
+      scaleFilter,
+      '-c:v',
+      'libx264',
+      '-preset',
+      'fast',
+      '-crf',
+      '18',
+      '-pix_fmt',
+      'yuv420p',
+      '-y',
+      outPath
     ])
   }
 }
@@ -714,18 +981,29 @@ export async function spliceVideo(
     console.log(`[FFmpeg:Splice] Phase 2: Concatenating ${totalCount} pieces + muxing audio`)
     onProgress?.({ percent: 88 })
 
-    const listContent = pieceFiles
-      .map((f) => `file '${f.replace(/'/g, "'\\''")}'`)
-      .join('\n')
+    const listContent = pieceFiles.map((f) => `file '${f.replace(/'/g, "'\\''")}'`).join('\n')
     const listPath = path.join(tempDir, 'concat-list.txt')
     writeFileSync(listPath, listContent, 'utf-8')
 
     const args = [
-      '-f', 'concat', '-safe', '0', '-i', listPath,
-      '-i', mixedAudioPath,
-      '-map', '0:v', '-map', '1:a',
-      '-c:v', 'copy',
-      '-c:a', 'aac', '-b:a', audioBitrate
+      '-f',
+      'concat',
+      '-safe',
+      '0',
+      '-i',
+      listPath,
+      '-i',
+      mixedAudioPath,
+      '-map',
+      '0:v',
+      '-map',
+      '1:a',
+      '-c:v',
+      'copy',
+      '-c:a',
+      'aac',
+      '-b:a',
+      audioBitrate
     ]
 
     if (format === 'mp4') {

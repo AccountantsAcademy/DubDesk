@@ -116,7 +116,7 @@ const initialState: UIState = {
   panels: defaultPanels,
   modals: defaultModals,
   activePanel: 'properties',
-  timelineHeight: 200,
+  timelineHeight: 240,
   videoPlayerSize: { width: 640, height: 360 },
   theme: 'dark',
   toasts: [],
@@ -245,7 +245,6 @@ export const useUIStore = create<UIStore>()(
           sidebarWidth: state.sidebarWidth,
           panels: state.panels,
           activePanel: state.activePanel,
-          timelineHeight: state.timelineHeight,
           theme: state.theme
         })
       }

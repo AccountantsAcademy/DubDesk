@@ -8,19 +8,15 @@ import { useCallback, useEffect, useState } from 'react'
  * with draggable edges to adjust the range.
  */
 export function RangeSelection(): React.JSX.Element | null {
-  const { rangeStartMs, rangeEndMs, msToPixels, pixelsToMs, setRange } =
-    useTimelineStore()
+  const { rangeStartMs, rangeEndMs, msToPixels, pixelsToMs, setRange } = useTimelineStore()
 
   const [resizingEdge, setResizingEdge] = useState<'start' | 'end' | null>(null)
 
-  const handleEdgeMouseDown = useCallback(
-    (edge: 'start' | 'end', e: React.MouseEvent) => {
-      e.stopPropagation()
-      e.preventDefault()
-      setResizingEdge(edge)
-    },
-    []
-  )
+  const handleEdgeMouseDown = useCallback((edge: 'start' | 'end', e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    setResizingEdge(edge)
+  }, [])
 
   // Handle edge dragging
   useEffect(() => {
@@ -34,8 +30,7 @@ export function RangeSelection(): React.JSX.Element | null {
       const clickX = e.clientX - rect.left + scrollContainer.scrollLeft - 80
       const timeMs = Math.max(0, pixelsToMs(Math.max(0, clickX)))
 
-      const { rangeStartMs: currentStart, rangeEndMs: currentEnd } =
-        useTimelineStore.getState()
+      const { rangeStartMs: currentStart, rangeEndMs: currentEnd } = useTimelineStore.getState()
 
       if (resizingEdge === 'start' && currentEnd !== null) {
         setRange(timeMs, currentEnd)

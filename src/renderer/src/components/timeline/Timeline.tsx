@@ -1,3 +1,4 @@
+import { useOverlayStore } from '@renderer/stores/overlay.store'
 import { usePlaybackStore } from '@renderer/stores/playback.store'
 import { useSegmentStore } from '@renderer/stores/segment.store'
 import { useTimelineStore } from '@renderer/stores/timeline.store'
@@ -29,6 +30,7 @@ export function Timeline(): React.JSX.Element {
   const pause = usePlaybackStore((state) => state.pause)
   const segments = useSegmentStore((state) => state.segments)
   const clearSelection = useSegmentStore((state) => state.clearSelection)
+  const overlays = useOverlayStore((state) => state.overlays)
 
   // Track viewport width for zoom calculations
   useEffect(() => {
@@ -92,11 +94,13 @@ export function Timeline(): React.JSX.Element {
       // Only handle left click
       if (e.button !== 0) return
 
-      // Don't scrub if clicking on segments
+      // Don't scrub if clicking on segments or overlays
       if ((e.target as HTMLElement).closest('.segment-item')) return
+      if ((e.target as HTMLElement).closest('.overlay-item')) return
 
       // Clear selection when clicking background
       clearSelection()
+      useOverlayStore.getState().selectOverlay(null)
 
       const timeMs = getTimeFromMouseEvent(e)
       if (timeMs === null) return
@@ -289,6 +293,9 @@ export function Timeline(): React.JSX.Element {
 
             {/* Segments Track */}
             <TimelineTrack label="Dubbed" type="dubbed" height={80} segments={segments} />
+
+            {/* Overlays Track */}
+            <TimelineTrack label="Overlays" type="overlays" height={40} overlays={overlays} />
 
             {/* Range Selection Overlay */}
             <div className="absolute left-20 right-0 top-0 bottom-0 pointer-events-none">

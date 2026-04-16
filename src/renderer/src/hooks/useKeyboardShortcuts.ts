@@ -4,6 +4,7 @@
  */
 
 import { useHistoryStore } from '@renderer/stores/history.store'
+import { useOverlayStore } from '@renderer/stores/overlay.store'
 import { usePlaybackStore } from '@renderer/stores/playback.store'
 import { useProjectStore } from '@renderer/stores/project.store'
 import { useQuickDubStore } from '@renderer/stores/quickdub.store'
@@ -54,6 +55,20 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
         return
       }
 
+      // Left/Right arrow - Seek by one frame (1/25s = 40ms)
+      if (e.code === 'ArrowLeft' && !isMeta) {
+        e.preventDefault()
+        const { currentTimeMs } = usePlaybackStore.getState()
+        usePlaybackStore.getState().seek(currentTimeMs - 40)
+        return
+      }
+      if (e.code === 'ArrowRight' && !isMeta) {
+        e.preventDefault()
+        const { currentTimeMs } = usePlaybackStore.getState()
+        usePlaybackStore.getState().seek(currentTimeMs + 40)
+        return
+      }
+
       // J - Previous segment
       if (e.code === 'KeyJ' && !isMeta) {
         e.preventDefault()
@@ -82,8 +97,14 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
         return
       }
 
-      // Delete or Backspace - Delete selected segments
+      // Delete or Backspace - Delete selected segments or overlay
       if ((e.code === 'Delete' || e.code === 'Backspace') && !isMeta) {
+        const { selectedOverlayId, deleteOverlay } = useOverlayStore.getState()
+        if (selectedOverlayId) {
+          e.preventDefault()
+          deleteOverlay(selectedOverlayId)
+          return
+        }
         if (selectedSegmentIds.size > 0) {
           e.preventDefault()
           deleteSelectedSegments()
@@ -113,7 +134,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
         return
       }
 
-      // Escape - Exit Quick Dub mode / close Quick Dub modal
+      // Escape - Deselect overlay / exit Quick Dub mode / close modal
       if (e.code === 'Escape') {
         const { rangeSelectionMode, setRangeSelectionMode, clearRange } =
           useTimelineStore.getState()
@@ -132,6 +153,20 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
           e.preventDefault()
           clearRange()
           setRangeSelectionMode(false)
+          return
+        }
+
+        // Deselect overlay or segments
+        const { selectedOverlayId, selectOverlay } = useOverlayStore.getState()
+        if (selectedOverlayId) {
+          e.preventDefault()
+          selectOverlay(null)
+          return
+        }
+
+        if (selectedSegmentIds.size > 0) {
+          e.preventDefault()
+          useSegmentStore.getState().clearSelection()
           return
         }
       }

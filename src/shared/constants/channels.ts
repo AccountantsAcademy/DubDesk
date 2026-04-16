@@ -119,6 +119,15 @@ export const IPC_CHANNELS = {
     RECORD: 'history:record'
   },
 
+  // Image Overlay operations
+  OVERLAY: {
+    GET_ALL: 'overlay:get-all',
+    CREATE: 'overlay:create',
+    UPDATE: 'overlay:update',
+    DELETE: 'overlay:delete',
+    IMPORT_IMAGE: 'overlay:import-image'
+  },
+
   // Quick Dub operations
   QUICK_DUB: {
     CLONE_VOICE: 'quick-dub:clone-voice',

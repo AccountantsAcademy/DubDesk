@@ -5,20 +5,16 @@
 
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
-import { app } from 'electron'
 import { IPC_CHANNELS } from '@shared/constants/channels'
 import { hashText } from '@shared/utils/hash'
+import { app } from 'electron'
 import { projectRepository, segmentRepository } from '../services/database/repositories'
 import { cloneVoiceFromAudio, transcribeAudio } from '../services/elevenlabs'
 import { generateSpeech } from '../services/elevenlabs/tts'
 import { extractAudioSegment, extractVideoClip } from '../services/ffmpeg/extract'
 import { stretchAudioToDuration } from '../services/ffmpeg/stretch'
 import { normalizeVolumeToReference, trimSilence } from '../services/ffmpeg/volume'
-import {
-  downloadLipsyncResult,
-  submitLipsync,
-  waitForLipsync
-} from '../services/syncso/lipsync'
+import { downloadLipsyncResult, submitLipsync, waitForLipsync } from '../services/syncso/lipsync'
 import { createHandler } from './index'
 
 /** ElevenLabs voice cloning file size limit */
@@ -40,9 +36,7 @@ export function registerQuickDubHandlers(): void {
       }
 
       if (project.settings?.clonedVoiceId) {
-        console.log(
-          `[QuickDub] Reusing cached cloned voice: ${project.settings.clonedVoiceId}`
-        )
+        console.log(`[QuickDub] Reusing cached cloned voice: ${project.settings.clonedVoiceId}`)
         return {
           voiceId: project.settings.clonedVoiceId,
           name: voiceName
@@ -55,7 +49,10 @@ export function registerQuickDubHandlers(): void {
       const samplePath = path.join(projectDir, 'audio', 'voice_clone_sample.mp3')
 
       const videoDurationMs = project.sourceVideoDurationMs || 0
-      const sampleDurationMs = Math.min(VOICE_CLONE_SAMPLE_DURATION_MS, videoDurationMs || VOICE_CLONE_SAMPLE_DURATION_MS)
+      const sampleDurationMs = Math.min(
+        VOICE_CLONE_SAMPLE_DURATION_MS,
+        videoDurationMs || VOICE_CLONE_SAMPLE_DURATION_MS
+      )
 
       console.log(`[QuickDub] Extracting ${sampleDurationMs}ms voice sample from: ${audioPath}`)
       await extractAudioSegment(audioPath, samplePath, 0, sampleDurationMs, {
@@ -110,9 +107,7 @@ export function registerQuickDubHandlers(): void {
         `quickdub_${startTimeMs}_${endTimeMs}.wav`
       )
 
-      console.log(
-        `[QuickDub] Extracting audio range: ${startTimeMs}ms - ${endTimeMs}ms`
-      )
+      console.log(`[QuickDub] Extracting audio range: ${startTimeMs}ms - ${endTimeMs}ms`)
 
       await extractAudioSegment(audioPath, tempAudioPath, startTimeMs, endTimeMs, {
         format: 'wav',

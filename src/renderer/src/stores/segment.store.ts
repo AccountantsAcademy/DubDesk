@@ -74,11 +74,7 @@ interface SegmentActions {
   markAudioGenerated: (id: string, hash: string) => void
 
   // Lip-sync management
-  redoLipsync: (
-    id: string,
-    projectId: string,
-    videoPath: string
-  ) => Promise<void>
+  redoLipsync: (id: string, projectId: string, videoPath: string) => Promise<void>
 
   setSegments: (segments: Segment[]) => void
   setSpeakers: (speakers: Speaker[]) => void
@@ -597,9 +593,7 @@ export const useSegmentStore = create<SegmentStore>()(
 
           set({
             segments: segments.map((s) =>
-              s.id === id
-                ? { ...s, lipsyncVideoPath: response.data.lipsyncVideoPath }
-                : s
+              s.id === id ? { ...s, lipsyncVideoPath: response.data.lipsyncVideoPath } : s
             ),
             isGenerating: false
           })

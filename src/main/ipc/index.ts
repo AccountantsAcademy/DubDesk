@@ -8,6 +8,7 @@ import { registerElevenLabsHandlers } from './elevenlabs.ipc'
 import { registerFFmpegHandlers } from './ffmpeg.ipc'
 import { registerFilesystemHandlers } from './filesystem.ipc'
 import { registerHistoryHandlers } from './history.ipc'
+import { registerOverlayHandlers } from './overlay.ipc'
 import { registerProjectHandlers } from './project.ipc'
 import { registerQuickDubHandlers } from './quickdub.ipc'
 import { registerSegmentHandlers } from './segment.ipc'
@@ -23,6 +24,7 @@ export function registerAllHandlers(): void {
 
   registerProjectHandlers()
   registerSegmentHandlers()
+  registerOverlayHandlers()
   registerSettingsHandlers()
   registerFilesystemHandlers()
   registerElevenLabsHandlers()

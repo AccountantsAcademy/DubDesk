@@ -19,12 +19,7 @@ export function measureMeanVolume(audioPath: string): Promise<number> {
       return
     }
 
-    const proc = spawn(binPath, [
-      '-i', audioPath,
-      '-af', 'volumedetect',
-      '-f', 'null',
-      '-'
-    ])
+    const proc = spawn(binPath, ['-i', audioPath, '-af', 'volumedetect', '-f', 'null', '-'])
 
     let stderr = ''
     proc.stderr.on('data', (data: Buffer) => {
@@ -66,11 +61,16 @@ export async function adjustVolume(
 
   await new Promise<void>((resolve, reject) => {
     const proc = spawn(binPath, [
-      '-i', inputPath,
-      '-af', `volume=${gainDb.toFixed(2)}dB`,
-      '-c:a', 'libmp3lame',
-      '-b:a', '128k',
-      '-y', tempPath
+      '-i',
+      inputPath,
+      '-af',
+      `volume=${gainDb.toFixed(2)}dB`,
+      '-c:a',
+      'libmp3lame',
+      '-b:a',
+      '128k',
+      '-y',
+      tempPath
     ])
 
     let stderr = ''
@@ -100,10 +100,7 @@ export async function adjustVolume(
  * Removes silence below -40dB from both ends.
  * Can write to the same path (uses a temp file internally).
  */
-export async function trimSilence(
-  inputPath: string,
-  outputPath: string
-): Promise<void> {
+export async function trimSilence(inputPath: string, outputPath: string): Promise<void> {
   const binPath = ffmpegPath
   if (!binPath) {
     throw new Error('FFmpeg binary not found')
@@ -115,11 +112,16 @@ export async function trimSilence(
   // silenceremove: start_periods=1 trims leading silence, stop_periods=-1 trims trailing silence
   await new Promise<void>((resolve, reject) => {
     const proc = spawn(binPath, [
-      '-i', inputPath,
-      '-af', 'silenceremove=start_periods=1:start_duration=0:start_threshold=-40dB:stop_periods=-1:stop_duration=0:stop_threshold=-40dB',
-      '-c:a', 'libmp3lame',
-      '-b:a', '128k',
-      '-y', tempPath
+      '-i',
+      inputPath,
+      '-af',
+      'silenceremove=start_periods=1:start_duration=0:start_threshold=-40dB:stop_periods=-1:stop_duration=0:stop_threshold=-40dB',
+      '-c:a',
+      'libmp3lame',
+      '-b:a',
+      '128k',
+      '-y',
+      tempPath
     ])
 
     let stderr = ''

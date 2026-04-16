@@ -585,9 +585,7 @@ export function SettingsModal(): React.JSX.Element | null {
                     </div>
                     <button
                       type="button"
-                      onClick={() =>
-                        setShowKeys((prev) => ({ ...prev, syncso: !prev.syncso }))
-                      }
+                      onClick={() => setShowKeys((prev) => ({ ...prev, syncso: !prev.syncso }))}
                       className="px-3 py-2 text-sm bg-chrome-hover rounded hover:bg-chrome-active"
                     >
                       {showKeys.syncso ? 'Hide' : 'Show'}

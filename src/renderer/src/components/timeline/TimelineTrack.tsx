@@ -1,24 +1,28 @@
 import { usePlaybackStore } from '@renderer/stores/playback.store'
 import { useProjectStore } from '@renderer/stores/project.store'
 import { useTimelineStore } from '@renderer/stores/timeline.store'
+import type { ImageOverlay } from '@shared/types/overlay'
 import type { Segment } from '@shared/types/segment'
 import type React from 'react'
 import { useEffect, useRef } from 'react'
+import { OverlayItem } from './OverlayItem'
 import { SegmentItem } from './SegmentItem'
 import { WaveformDisplay } from './WaveformDisplay'
 
 interface TimelineTrackProps {
   label: string
-  type: 'original' | 'dubbed'
+  type: 'original' | 'dubbed' | 'overlays'
   height: number
   segments?: Segment[]
+  overlays?: ImageOverlay[]
 }
 
 export function TimelineTrack({
   label,
   type,
   height,
-  segments = []
+  segments = [],
+  overlays = []
 }: TimelineTrackProps): React.JSX.Element {
   const { showOriginalAudio } = useTimelineStore()
   const { soloOriginal, soloDubbed } = usePlaybackStore()
@@ -48,8 +52,10 @@ export function TimelineTrack({
       <div className="absolute left-20 right-0 top-0 bottom-0">
         {type === 'original' ? (
           <OriginalAudioTrack height={height} />
-        ) : (
+        ) : type === 'dubbed' ? (
           <DubbedSegmentsTrack segments={segments} height={height} />
+        ) : (
+          <OverlaysTrack overlays={overlays} height={height} />
         )}
       </div>
     </div>
@@ -175,6 +181,28 @@ function DubbedSegmentsTrack({ segments, height }: DubbedSegmentsTrackProps): Re
       {segments.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center text-chrome-muted text-xs">
           No segments - transcribe audio to create segments
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface OverlaysTrackProps {
+  overlays: ImageOverlay[]
+  height: number
+}
+
+function OverlaysTrack({ overlays, height }: OverlaysTrackProps): React.JSX.Element {
+  return (
+    <div className="h-full relative">
+      {overlays.map((overlay) => (
+        <OverlayItem key={overlay.id} overlay={overlay} trackHeight={height} />
+      ))}
+
+      {/* Empty state */}
+      {overlays.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center text-chrome-muted text-xs">
+          No image overlays
         </div>
       )}
     </div>

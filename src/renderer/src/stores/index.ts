@@ -1,4 +1,5 @@
 export { selectCanRedo, selectCanUndo, useHistoryStore } from './history.store'
+export { useOverlayStore } from './overlay.store'
 export {
   selectCurrentSegmentId,
   selectEffectiveDubbedVolume,
@@ -10,6 +11,7 @@ export {
   usePlaybackStore
 } from './playback.store'
 export { useProjectStore } from './project.store'
+export { useQuickDubStore } from './quickdub.store'
 export {
   isSegmentStale,
   selectSegmentById,
@@ -20,7 +22,6 @@ export {
   selectStaleSegments,
   useSegmentStore
 } from './segment.store'
-export { useQuickDubStore } from './quickdub.store'
 export {
   selectHasRange,
   selectIsDragging,

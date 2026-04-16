@@ -1,8 +1,10 @@
+import { useOverlayStore } from '@renderer/stores/overlay.store'
 import { usePlaybackStore } from '@renderer/stores/playback.store'
 import { useProjectStore } from '@renderer/stores/project.store'
 import { useUIStore } from '@renderer/stores/ui.store'
 import type React from 'react'
 import { useCallback, useEffect, useRef } from 'react'
+import { ImageOverlayLayer } from './ImageOverlayLayer'
 import { LipsyncOverlay } from './LipsyncOverlay'
 import { PlaybackControls } from './PlaybackControls'
 
@@ -97,8 +99,8 @@ export function VideoPlayer(): React.JSX.Element {
     if (isSyncingFromVideo.current) return
 
     const videoTimeMs = video.currentTime * 1000
-    // Only sync if difference is significant (> 100ms)
-    if (Math.abs(videoTimeMs - currentTimeMs) > 100) {
+    // Only sync if difference is significant (> 1 frame at 25fps)
+    if (Math.abs(videoTimeMs - currentTimeMs) > 30) {
       video.currentTime = currentTimeMs / 1000
     }
   }, [currentTimeMs, playbackState])
@@ -139,14 +141,16 @@ export function VideoPlayer(): React.JSX.Element {
     }
   }, [loop, loopStartMs, seek, pause])
 
-  // Handle click to toggle play/pause
+  // Handle click to toggle play/pause and deselect overlay
+  const selectOverlay = useOverlayStore((state) => state.selectOverlay)
   const handleClick = useCallback(() => {
+    selectOverlay(null)
     if (playbackState === 'playing') {
       pause()
     } else {
       play()
     }
-  }, [playbackState, play, pause])
+  }, [playbackState, play, pause, selectOverlay])
 
   // Handle double-click to toggle fullscreen
   const handleDoubleClick = useCallback(() => {
@@ -212,6 +216,9 @@ export function VideoPlayer(): React.JSX.Element {
 
             {/* Lip-synced video overlay — shows on top of original during lip-synced segments */}
             <LipsyncOverlay />
+
+            {/* Image overlays — user-imported images composited on top of video */}
+            <ImageOverlayLayer />
           </>
         ) : (
           <div className="text-chrome-muted text-center">

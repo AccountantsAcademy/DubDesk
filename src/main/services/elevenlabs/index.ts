@@ -5,8 +5,8 @@
 
 export * from './stt'
 export * from './tts'
-export * from './voices'
 export * from './voiceClone'
+export * from './voices'
 
 import { API_KEYS, type ElevenLabsRegion, keychainService } from '../keychain'
 

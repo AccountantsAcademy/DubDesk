@@ -220,6 +220,21 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS.SET_ELEVENLABS_REGION, { region })
   },
 
+  // Image Overlay operations
+  overlay: {
+    getAll: (projectId: string) => ipcRenderer.invoke(IPC_CHANNELS.OVERLAY.GET_ALL, { projectId }),
+    create: (data: {
+      projectId: string
+      sourceImagePath: string
+      startTimeMs: number
+      endTimeMs: number
+    }) => ipcRenderer.invoke(IPC_CHANNELS.OVERLAY.CREATE, data),
+    update: (id: string, updates: unknown) =>
+      ipcRenderer.invoke(IPC_CHANNELS.OVERLAY.UPDATE, { id, updates }),
+    delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.OVERLAY.DELETE, { id }),
+    importImage: () => ipcRenderer.invoke(IPC_CHANNELS.OVERLAY.IMPORT_IMAGE)
+  },
+
   // Quick Dub operations
   quickDub: {
     cloneVoice: (data: { projectId: string; audioPath: string; voiceName: string }) =>

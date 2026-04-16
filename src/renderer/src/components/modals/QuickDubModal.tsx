@@ -157,9 +157,7 @@ export function QuickDubModal(): React.JSX.Element | null {
             <div className="flex flex-col items-center py-8">
               <Spinner />
               <p className="text-sm text-chrome-muted mt-3">Transcribing selected range...</p>
-              <p className="text-xs text-chrome-muted/60 mt-1">
-                Extracting and analyzing audio
-              </p>
+              <p className="text-xs text-chrome-muted/60 mt-1">Extracting and analyzing audio</p>
             </div>
           )}
 
@@ -334,12 +332,7 @@ function StepIndicator({
       >
         {done ? (
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={3}
-              d="M5 13l4 4L19 7"
-            />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
           </svg>
         ) : null}
       </div>
@@ -358,19 +351,8 @@ function StepConnector(): React.JSX.Element {
 
 function Spinner(): React.JSX.Element {
   return (
-    <svg
-      className="w-8 h-8 animate-spin text-accent-primary"
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
+    <svg className="w-8 h-8 animate-spin text-accent-primary" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path
         className="opacity-75"
         fill="currentColor"

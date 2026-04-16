@@ -1,3 +1,4 @@
+import { useOverlayStore } from '@renderer/stores/overlay.store'
 import { usePlaybackStore } from '@renderer/stores/playback.store'
 import { useProjectStore } from '@renderer/stores/project.store'
 import { useTimelineStore } from '@renderer/stores/timeline.store'
@@ -24,10 +25,17 @@ export function TimelineControls(): React.JSX.Element {
   const { durationMs, currentTimeMs } = usePlaybackStore()
   const currentProject = useProjectStore((state) => state.currentProject)
 
+  const importAndCreateOverlay = useOverlayStore((state) => state.importAndCreateOverlay)
+
   const isSameLanguage =
     currentProject?.sourceLanguage &&
     currentProject?.targetLanguage &&
     currentProject.sourceLanguage === currentProject.targetLanguage
+
+  const handleAddOverlay = useCallback(() => {
+    if (!currentProject?.id) return
+    importAndCreateOverlay(currentProject.id, currentTimeMs, durationMs)
+  }, [currentProject?.id, currentTimeMs, durationMs, importAndCreateOverlay])
 
   const handleZoomChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -165,6 +173,28 @@ export function TimelineControls(): React.JSX.Element {
               />
             </svg>
             Quick Edit
+          </button>
+        </>
+      )}
+
+      {/* Image overlay button */}
+      {currentProject && (
+        <>
+          <div className="h-4 w-px bg-chrome-border" />
+          <button
+            onClick={handleAddOverlay}
+            className="flex items-center gap-1.5 px-2 py-1 text-xs rounded hover:bg-chrome-hover text-chrome-muted hover:text-chrome-text"
+            title="Add image overlay"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
+            </svg>
+            Overlay
           </button>
         </>
       )}
