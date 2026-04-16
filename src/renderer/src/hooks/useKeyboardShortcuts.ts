@@ -5,6 +5,7 @@
 
 import { useHistoryStore } from '@renderer/stores/history.store'
 import { usePlaybackStore } from '@renderer/stores/playback.store'
+import { useProjectStore } from '@renderer/stores/project.store'
 import { useQuickDubStore } from '@renderer/stores/quickdub.store'
 import { useSegmentStore } from '@renderer/stores/segment.store'
 import { useTimelineStore } from '@renderer/stores/timeline.store'
@@ -97,11 +98,18 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
         return
       }
 
-      // Q - Toggle Quick Dub mode
+      // Q - Toggle Quick Edit mode (only when source/target language are the same)
       if (e.code === 'KeyQ' && !isMeta) {
-        e.preventDefault()
-        const { rangeSelectionMode, setRangeSelectionMode } = useTimelineStore.getState()
-        setRangeSelectionMode(!rangeSelectionMode)
+        const project = useProjectStore.getState().currentProject
+        const sameLanguage =
+          project?.sourceLanguage &&
+          project?.targetLanguage &&
+          project.sourceLanguage === project.targetLanguage
+        if (sameLanguage) {
+          e.preventDefault()
+          const { rangeSelectionMode, setRangeSelectionMode } = useTimelineStore.getState()
+          setRangeSelectionMode(!rangeSelectionMode)
+        }
         return
       }
 

@@ -352,9 +352,15 @@ export function WorkflowToolbar(): React.JSX.Element | null {
       const selectedFilter =
         formatFilters[selectedFormat] || formatFilters[isAudioOnly ? 'm4a' : 'mp4']
 
+      const sameLanguage =
+        currentProject.sourceLanguage &&
+        currentProject.targetLanguage &&
+        currentProject.sourceLanguage === currentProject.targetLanguage
+      const exportSuffix = sameLanguage ? '_edited' : '_dubbed'
+
       const saveResult = await window.dubdesk.fs.saveDialog({
         title: isAudioOnly ? 'Export Audio' : 'Export Video',
-        defaultPath: `${currentProject.name}_dubbed.${selectedFormat}`,
+        defaultPath: `${currentProject.name}${exportSuffix}.${selectedFormat}`,
         filters: [selectedFilter]
       })
 

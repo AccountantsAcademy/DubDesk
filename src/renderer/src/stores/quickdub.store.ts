@@ -191,6 +191,9 @@ export const useQuickDubStore = create<QuickDubStore>()(
 
             if (lipsyncResponse.success) {
               set({ lipsyncVideoPath: lipsyncResponse.data.lipsyncVideoPath })
+              // Reload segments so the segment store picks up the lipsyncVideoPath from DB
+              const { useSegmentStore } = await import('./segment.store')
+              await useSegmentStore.getState().loadSegments(projectId)
             }
             // If lip-sync fails, we still complete (audio-only is fine)
           } catch {

@@ -7,9 +7,11 @@ import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { hashText } from '@shared/utils/hash'
 import { app } from 'electron'
-import { segmentRepository, speakerRepository } from '../database/repositories'
+import { projectRepository, segmentRepository, speakerRepository } from '../database/repositories'
 import { generateSpeech, type TTSOptions } from '../elevenlabs'
+import { extractAudioSegment } from '../ffmpeg/extract'
 import { stretchAudioToDuration } from '../ffmpeg'
+import { normalizeVolumeToReference, trimSilence } from '../ffmpeg/volume'
 import { setWorkflowState, type WorkflowProgress } from './index'
 
 export interface GenerateWorkflowOptions {
@@ -255,6 +257,13 @@ export async function generateSingleSegment(
     // Calculate target segment duration
     const targetDurationMs = segment.endTimeMs - segment.startTimeMs
 
+    // Check if same-language project (Quick Edit mode)
+    const project = projectRepository.findById(segment.projectId)
+    const isSameLanguage =
+      project?.sourceLanguage &&
+      project?.targetLanguage &&
+      project.sourceLanguage === project.targetLanguage
+
     // Generate TTS audio
     const result = await generateSpeech(segment.translatedText, outputPath, {
       voiceId,
@@ -264,6 +273,15 @@ export async function generateSingleSegment(
       outputFormat: 'mp3_44100_128',
       ...options
     })
+
+    // Trim leading silence before stretching (same-language only)
+    if (isSameLanguage) {
+      try {
+        await trimSilence(result.audioPath, result.audioPath)
+      } catch (err) {
+        console.warn('[GenerateSingle] Silence trim failed, continuing:', err)
+      }
+    }
 
     // Stretch audio to match segment duration using FFmpeg
     let finalDurationMs = result.durationMs
@@ -285,6 +303,27 @@ export async function generateSingleSegment(
         console.error(`[GenerateSingle] Stretch failed:`, stretchError)
         // Fall back to original duration if stretch fails
       }
+    }
+
+    // Volume-match to original audio (same-language only)
+    if (isSameLanguage && project?.sourceAudioPath) {
+      const refAudioPath = path.join(audioDir, `${segmentId}_ref.wav`)
+      try {
+        await extractAudioSegment(
+          project.sourceAudioPath,
+          refAudioPath,
+          segment.startTimeMs,
+          segment.endTimeMs,
+          { format: 'wav', sampleRate: 44100, channels: 1 }
+        )
+        await normalizeVolumeToReference(result.audioPath, refAudioPath, result.audioPath)
+      } catch (err) {
+        console.warn('[GenerateSingle] Volume normalization failed:', err)
+      }
+      try {
+        const { unlink } = await import('node:fs/promises')
+        await unlink(refAudioPath)
+      } catch {}
     }
 
     // Compute hash of the text that was used for generation

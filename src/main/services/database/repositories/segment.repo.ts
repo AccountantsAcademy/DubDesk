@@ -473,7 +473,8 @@ export const segmentRepository = {
         audioGeneratedAt: null,
         translatedTextHash: null,
         audioGeneratedVoiceId: null,
-        audioGeneratedDurationMs: null
+        audioGeneratedDurationMs: null,
+        lipsyncVideoPath: null
       })
 
       // Delete all other segments

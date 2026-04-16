@@ -7,11 +7,13 @@ import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import { app } from 'electron'
 import { IPC_CHANNELS } from '@shared/constants/channels'
+import { hashText } from '@shared/utils/hash'
 import { projectRepository, segmentRepository } from '../services/database/repositories'
 import { cloneVoiceFromAudio, transcribeAudio } from '../services/elevenlabs'
 import { generateSpeech } from '../services/elevenlabs/tts'
 import { extractAudioSegment, extractVideoClip } from '../services/ffmpeg/extract'
 import { stretchAudioToDuration } from '../services/ffmpeg/stretch'
+import { normalizeVolumeToReference, trimSilence } from '../services/ffmpeg/volume'
 import {
   downloadLipsyncResult,
   submitLipsync,
@@ -171,11 +173,27 @@ export function registerQuickDubHandlers(): void {
         voiceId
       })
 
+      // Check if same-language project (Quick Edit mode)
+      const project = projectRepository.findById(projectId)
+      const isSameLanguage =
+        project?.sourceLanguage &&
+        project?.targetLanguage &&
+        project.sourceLanguage === project.targetLanguage
+
       console.log(`[QuickDub] Generating TTS for segment ${segment.id}...`)
 
       // Generate TTS
       const rawAudioPath = path.join(ttsDir, `${segment.id}_raw.mp3`)
       await generateSpeech(text, rawAudioPath, { voiceId })
+
+      // Trim leading silence before stretching (same-language only)
+      if (isSameLanguage) {
+        try {
+          await trimSilence(rawAudioPath, rawAudioPath)
+        } catch (err) {
+          console.warn('[QuickDub] Silence trim failed, continuing:', err)
+        }
+      }
 
       // Stretch audio to match the range duration
       const finalAudioPath = path.join(ttsDir, `${segment.id}.mp3`)
@@ -183,12 +201,35 @@ export function registerQuickDubHandlers(): void {
         targetDurationMs: rangeDurationMs
       })
 
-      // Update segment with audio info
+      // Volume-match to original audio (same-language only)
+      if (isSameLanguage && project?.sourceAudioPath) {
+        const refAudioPath = path.join(ttsDir, `${segment.id}_ref.wav`)
+        try {
+          await extractAudioSegment(project.sourceAudioPath, refAudioPath, startTimeMs, endTimeMs, {
+            format: 'wav',
+            sampleRate: 44100,
+            channels: 1
+          })
+          await normalizeVolumeToReference(finalAudioPath, refAudioPath, finalAudioPath)
+        } catch (err) {
+          console.warn('[QuickDub] Volume normalization failed, using original volume:', err)
+        }
+        try {
+          const { unlink } = await import('node:fs/promises')
+          await unlink(refAudioPath)
+        } catch {}
+      }
+
+      // Update segment with audio info + staleness tracking fields
       segmentRepository.update(segment.id, {
         audioFilePath: finalAudioPath,
         audioDurationMs: stretchResult.finalDurationMs,
         status: 'ready',
-        speedAdjustment: stretchResult.speedRatio
+        speedAdjustment: stretchResult.speedRatio,
+        translatedTextHash: hashText(text),
+        audioGeneratedVoiceId: voiceId,
+        audioGeneratedAt: new Date().toISOString(),
+        audioGeneratedDurationMs: rangeDurationMs
       })
 
       console.log(

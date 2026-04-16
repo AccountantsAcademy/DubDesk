@@ -78,7 +78,7 @@ export function QuickDubModal(): React.JSX.Element | null {
         setDubbedAudioVolume(usePlaybackStore.getState().originalAudioVolume)
       }
 
-      addToast('success', 'Quick Dub segment added to timeline')
+      addToast('success', 'Quick Edit segment added to timeline')
     }
     reset()
     clearRange()
@@ -98,7 +98,7 @@ export function QuickDubModal(): React.JSX.Element | null {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-chrome-border">
           <div>
-            <h2 className="text-base font-semibold">Quick Dub</h2>
+            <h2 className="text-base font-semibold">Quick Edit</h2>
             {rangeStartMs !== null && rangeEndMs !== null && (
               <p className="text-xs text-chrome-muted mt-0.5">
                 {formatTime(rangeStartMs)} - {formatTime(rangeEndMs)}
@@ -263,7 +263,7 @@ export function QuickDubModal(): React.JSX.Element | null {
                   />
                 </svg>
               </div>
-              <p className="text-sm font-medium mb-1">Quick Dub Complete</p>
+              <p className="text-sm font-medium mb-1">Quick Edit Complete</p>
               <p className="text-xs text-chrome-muted mb-4">
                 The dubbed segment has been added to your timeline.
               </p>
